@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import React from "react";
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e.message }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: 32, color: "white", background: "#7a9e7e", minHeight: "100vh", fontFamily: "Inter, sans-serif" }}>
+        <div style={{ fontSize: 16, marginBottom: 8 }}>something went wrong:</div>
+        <div style={{ fontSize: 13, opacity: 0.8 }}>{this.state.error}</div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 // Inject Inter font + tight global line-height
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
@@ -1776,6 +1790,7 @@ export default function App() {
   C = currentTheme; // keep legacy C in sync
 
   return (
+    <ErrorBoundary>
     <ThemeContext.Provider value={currentTheme}>
     <div style={{ ...styles.app, background: currentTheme.bg }}>
       <div style={{ ...styles.phone, background: currentTheme.bg }}>
@@ -1800,5 +1815,6 @@ export default function App() {
       </div>
     </div>
     </ThemeContext.Provider>
+    </ErrorBoundary>
   );
 }

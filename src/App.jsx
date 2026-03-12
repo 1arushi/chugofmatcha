@@ -1483,17 +1483,23 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
               const favCafeRank = favCafe ? globalCafeRanks.findIndex(([c]) => c === favCafe) + 1 : null;
               return (
                 <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 12 }}>
-                  <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 14, textAlign: "center" }}>on com</div>
+
                   {favCafe && favCafeRank > 0 && (
                     <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
                       you're <span style={{ fontWeight: "700" }}>top #{favCafeRank}</span> at <span style={{ fontWeight: "700" }}>{favCafe}</span>
                     </div>
                   )}
-                  {myMatcha > 0 && totalMatcha > 0 && (
-                    <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
-                      you account for <span style={{ fontWeight: "700" }}>{matchaPct}%</span> of the matcha drank on com 🍵
-                    </div>
-                  )}
+                  {myMatcha > 0 && totalMatcha > 0 && (() => {
+                    // percentile: what % of users drink LESS matcha than me
+                    const allUserMatcha = communityStats.userMatchaChugs || [];
+                    const below = allUserMatcha.filter(n => n < myMatcha).length;
+                    const topPct = allUserMatcha.length > 1 ? Math.round((1 - below / allUserMatcha.length) * 100) : matchaPct;
+                    return (
+                      <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
+                        you are in the top <span style={{ fontWeight: "700" }}>{topPct}%</span> of com chuggers 🍵
+                      </div>
+                    );
+                  })()}
                   <div style={{ color: C.textMuted, fontSize: 11, textAlign: "center" }}>
                     based on {communityStats.totalLogs} logs
                   </div>
@@ -1663,17 +1669,20 @@ export default function App() {
   // Load community stats for percentile comparisons
   const loadCommunityStats = async () => {
     try {
-      const allLogs = await sb.get("logs", "select=drinks,chugs,avg_price,cafe");
+      const allLogs = await sb.get("logs", "select=drinks,chugs,avg_price,cafe,user_id");
       if (!allLogs || allLogs.error) return;
-      // Drink counts across all users
       const drinkTotals = { matcha: 0, hojicha: 0, tea: 0, coffee: 0 };
       const cafeVisits = {};
-      const userSpend = {};
+      const perUserMatcha = {};
       allLogs.forEach(l => {
         (l.drinks || []).forEach(d => { if (drinkTotals[d] !== undefined) drinkTotals[d] += (l.chugs || 1); });
         if (l.cafe) cafeVisits[l.cafe] = (cafeVisits[l.cafe] || 0) + 1;
+        if (l.user_id && (l.drinks||[]).includes("matcha")) {
+          perUserMatcha[l.user_id] = (perUserMatcha[l.user_id] || 0) + (l.chugs || 1);
+        }
       });
-      setCommunityStats({ drinkTotals, cafeVisits, totalLogs: allLogs.length });
+      const userMatchaChugs = Object.values(perUserMatcha);
+      setCommunityStats({ drinkTotals, cafeVisits, totalLogs: allLogs.length, userMatchaChugs });
     } catch(e) {}
   };
 

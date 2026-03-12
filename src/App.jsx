@@ -350,7 +350,7 @@ function SignInScreen({ onLogin }) {
         const existing = await sb.get("users", `username=eq.${encodeURIComponent(username.trim())}&select=id`);
         if (existing.length > 0) { setError("username taken, try another"); setLoading(false); return; }
         const now = new Date();
-        const joined = `${now.getDate().toString().padStart(2,"0")}.${(now.getMonth()+1).toString().padStart(2,"0")}.${now.getFullYear().toString().slice(2)}`;
+        const joined = `${(now.getMonth()+1).toString().padStart(2,"0")}.${now.getDate().toString().padStart(2,"0")}.${now.getFullYear().toString().slice(2)}`;
         const rows = await sb.post("users", {
           username: username.trim(), password_hash: hash,
           joined_date: joined, avatar: { gender:"female", skin:"#f5c5a3", hair:"#4a2c0a", outfit:"#7a9e7e" },
@@ -408,7 +408,7 @@ function CafeEntryScreen({ onNext, onBack, pastCafes = [] }) {
 
   const formatDisplay = (iso) => {
     const [y, m, d] = iso.split("-");
-    return `${d}.${m}.${y.slice(2)}`;
+    return `${m}.${d}.${y.slice(2)}`;
   };
 
   const suggestions = cafe.trim().length > 0
@@ -1071,7 +1071,7 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
           fullList={rankedCafes}
           renderRow={(cafe) => <span style={{ flex: 1 }}>{cafe}</span>}
           empty="no ranked cafes yet"
-          footer="top 10% of matcha chuggers 🍵"
+          footer={(() => { if (!communityStats || !communityStats.drinkTotals) return ""; const myMatcha = logs.reduce((s,l) => (l.drinks||[]).includes("matcha") ? s+(l.chugs||1) : s, 0); const total = communityStats.drinkTotals.matcha || 0; if (!myMatcha || !total) return ""; const pct = Math.round(myMatcha/total*100); return `you're ${pct}% of matcha on com 🍵`; })()}
           onNavigate={() => { setTab("your lists"); setListTab("fave cafes"); }}
         />
 
@@ -1471,32 +1471,31 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
             </div>
 
             {/* Community stats */}
-            {communityStats && communityStats.totalLogs > 1 && (() => {
+            {communityStats && communityStats.totalLogs > 0 && (() => {
               const myMatcha = logs.reduce((s, l) => (l.drinks||[]).includes("matcha") ? s + (l.chugs||1) : s, 0);
-              const myTotal = logs.reduce((s, l) => s + (l.chugs||1), 0);
-              const allCafeCounts = Object.values(communityStats.cafeVisits).sort((a,b) => b-a);
-              const totalMatchaDrinkers = communityStats.drinkTotals.matcha || 1;
-              const matchaPct = totalMatchaDrinkers > 0 ? Math.round(myMatcha / totalMatchaDrinkers * 100) : 0;
-              // Top cafe rank
+              const totalMatcha = communityStats.drinkTotals.matcha || 0;
+              const matchaPct = totalMatcha > 0 ? Math.round(myMatcha / totalMatcha * 100) : 0;
+              // Find fave cafe (most visited by this user) and its global rank
               const myCafes = [...new Set(logs.map(l => l.cafe))];
+              const myVisitCount = (c) => logs.filter(l => l.cafe === c).length;
+              const favCafe = myCafes.length > 0 ? myCafes.reduce((a,b) => myVisitCount(a) >= myVisitCount(b) ? a : b) : null;
               const globalCafeRanks = Object.entries(communityStats.cafeVisits).sort((a,b) => b[1]-a[1]);
-              const topCafe = myCafes.length > 0 ? myCafes.reduce((a,b) => (communityStats.cafeVisits[a]||0) > (communityStats.cafeVisits[b]||0) ? a : b) : null;
-              const topCafeRank = topCafe ? globalCafeRanks.findIndex(([c]) => c === topCafe) + 1 : null;
+              const favCafeRank = favCafe ? globalCafeRanks.findIndex(([c]) => c === favCafe) + 1 : null;
               return (
                 <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 12 }}>
-                  <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12, textAlign: "center" }}>community</div>
-                  {myMatcha > 0 && (
-                    <div style={{ color: C.text, fontSize: 13, textAlign: "center", marginBottom: 8 }}>
-                      you account for <span style={{ fontWeight: "700" }}>{matchaPct}%</span> of all matcha chugs 🍵
+                  <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 14, textAlign: "center" }}>on com</div>
+                  {favCafe && favCafeRank > 0 && (
+                    <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
+                      you're <span style={{ fontWeight: "700" }}>top #{favCafeRank}</span> at <span style={{ fontWeight: "700" }}>{favCafe}</span>
                     </div>
                   )}
-                  {topCafe && topCafeRank && (
-                    <div style={{ color: C.text, fontSize: 13, textAlign: "center", marginBottom: 8 }}>
-                      <span style={{ fontWeight: "700" }}>{topCafe}</span> is the #{topCafeRank} most visited cafe globally
+                  {myMatcha > 0 && totalMatcha > 0 && (
+                    <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
+                      you account for <span style={{ fontWeight: "700" }}>{matchaPct}%</span> of the matcha drank on com 🍵
                     </div>
                   )}
                   <div style={{ color: C.textMuted, fontSize: 11, textAlign: "center" }}>
-                    based on {communityStats.totalLogs} total logs
+                    based on {communityStats.totalLogs} logs
                   </div>
                 </div>
               );

@@ -1755,10 +1755,10 @@ export default function App() {
   const handleRankingDone = (newRanked) => {
     setRankedCafes(newRanked);
     setCurrentLog({});
-    if (userId) {
-      sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked }).catch(() => {});
-    }
     setScreen("profile");
+    if (userId) {
+      try { sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked }).catch(() => {}); } catch(e) {}
+    }
   };
 
   // Save avatar + theme changes to Supabase

@@ -399,7 +399,7 @@ function SignInScreen({ onLogin }) {
   );
 }
 
-function CafeEntryScreen({ onNext, onBack, pastCafes = [] }) {
+function CafeEntryScreen({ onNext, onBack, onSkip, pastCafes = [] }) {
   const C = useC();
   const [cafe, setCafe] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -1170,8 +1170,7 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
                     <input value={editForm.notes || ""} onChange={e => setEditForm(f => ({...f, notes: e.target.value}))} style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 18px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center" }} />
                   </div>
 
-                  <button onClick={() => {
-                    // Update all logs for this cafe with new ratings/price/notes
+                  <button onClick={async () => {
                     setLogs(prev => prev.map(l => l.cafe !== selectedCafe ? l : {
                       ...l,
                       studyRating: editForm.studyRating ?? l.studyRating,
@@ -1179,6 +1178,17 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
                       avgPrice: editForm.avgPrice ?? l.avgPrice,
                       notes: editForm.notes ?? l.notes,
                     }));
+                    // Save to Supabase
+                    if (userId) {
+                      try {
+                        await sb.patch("logs", `user_id=eq.${userId}&cafe=eq.${encodeURIComponent(selectedCafe)}`, {
+                          study_rating: editForm.studyRating,
+                          drink_rating: editForm.drinkRating,
+                          avg_price: editForm.avgPrice,
+                          notes: editForm.notes,
+                        });
+                      } catch(e) {}
+                    }
                     setEditingCafe(false);
                   }} style={{ background: C.text, color: C.textDark, border: "none", borderRadius: 50, padding: "12px 32px", fontSize: 14, fontFamily: "'Inter', sans-serif", cursor: "pointer", display: "block", margin: "16px auto 0", letterSpacing: "0.04em" }}>save</button>
                 </div>
@@ -1240,6 +1250,25 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
                   ))}
                 </div>
               )}
+              {/* Delete cafe button */}
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 24, marginBottom: 8 }}>
+                <button onClick={() => {
+                  if (window.confirm(`delete all logs for ${selectedCafe}?`)) {
+                    setLogs(prev => prev.filter(l => l.cafe !== selectedCafe));
+                    setRankedCafes(prev => prev.filter(c => c !== selectedCafe));
+                    if (userId) {
+                      try {
+                        sb.patch("users", `id=eq.${userId}`, { ranked_cafes: rankedCafes.filter(c => c !== selectedCafe) }).catch(() => {});
+                        fetch(`${SUPABASE_URL}/rest/v1/logs?user_id=eq.${userId}&cafe=eq.${encodeURIComponent(selectedCafe)}`, {
+                          method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+                        }).catch(() => {});
+                      } catch(e) {}
+                    }
+                    setSelectedCafe(null);
+                    setEditingCafe(false);
+                  }
+                }} style={{ background: "none", border: "none", color: `${C.text}40`, fontSize: 22, cursor: "pointer", padding: "8px 16px", lineHeight: 1 }}>🗑</button>
+              </div>
             </div>
           );
         }
@@ -1653,7 +1682,7 @@ function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
 
 export default function App() {
   const [screen, setScreen] = useState("signin");
-  const [appTheme, setAppTheme] = useState("green");
+  const [appTheme, setAppTheme] = useState(() => { try { return localStorage.getItem("com_theme") || "green"; } catch(e) { return "green"; } });
   const [avatar, setAvatar] = useState({ gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#7a9e7e" });
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState("");
@@ -1690,7 +1719,9 @@ export default function App() {
     setUserId(userRow.id);
     setUsername(userRow.username);
     setRankedCafes(userRow.ranked_cafes || []);
-    setAppTheme(userRow.theme || "green");
+    const t = userRow.theme || "green";
+    setAppTheme(t);
+    try { localStorage.setItem("com_theme", t); } catch(e) {}
     setAvatar(userRow.avatar || { gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#7a9e7e" });
     if (userRow.joined_date) setJoinedDate(userRow.joined_date);
     // Load user's logs
@@ -1791,6 +1822,7 @@ export default function App() {
 
   const handleSetTheme = (val) => {
     setAppTheme(val);
+    try { localStorage.setItem("com_theme", val); } catch(e) {}
     if (userId) sb.patch("users", `id=eq.${userId}`, { theme: val }).catch(() => {});
   };
 
@@ -1803,7 +1835,7 @@ export default function App() {
     <div style={{ ...styles.app, background: currentTheme.bg }}>
       <div style={{ ...styles.phone, background: currentTheme.bg }}>
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
-        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} pastCafes={[...new Set(logs.map(l => l.cafe))]} />}
+        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => { setFromProfile(false); setScreen("profile"); }} pastCafes={[...new Set(logs.map(l => l.cafe))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}
         {screen === "labels" && <LabelsScreen onNext={handleLabels} onBack={() => setScreen(isNewCafe ? "vibes" : "drink")} />}

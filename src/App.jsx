@@ -72,6 +72,12 @@ const sb = {
     });
     return res.json();
   },
+  async delete(table, params) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+      method: "DELETE", headers: this.headers
+    });
+    return res.ok;
+  },
   async patch(table, params, body) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
       method: "PATCH", headers: { ...this.headers, "Prefer": "return=representation" }, body: JSON.stringify(body)
@@ -1292,9 +1298,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
                         if (userId) {
                           try {
                             await sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked });
-                            await fetch(`${SUPABASE_URL}/rest/v1/logs?user_id=eq.${userId}&cafe=eq.${encodeURIComponent(cafe)}`, {
-                              method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-                            });
+                            await sb.delete("logs", `user_id=eq.${userId}&cafe=eq.${encodeURIComponent(cafe)}`);
                           } catch(e) {}
                         }
                       }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "10px 24px", color: C.textDark, fontSize: 14, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>delete</button>

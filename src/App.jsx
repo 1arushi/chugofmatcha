@@ -344,7 +344,7 @@ function SignInScreen({ onLogin }) {
           email: email.trim() || null
         });
         if (!rows || rows?.code || rows?.error || !Array.isArray(rows) || rows.length === 0) {
-          setError(`signup failed: ${JSON.stringify(rows)}`);
+          setError("signup failed, try again");
           setLoading(false); return;
         }
         onLogin(rows[0]);

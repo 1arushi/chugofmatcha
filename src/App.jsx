@@ -455,6 +455,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, pastCafes = [] }) {
       </div>
       <div style={{ paddingBottom: 40 }}>
         <NextBtn onClick={() => { setShowSuggestions(false); onNext(cafe || "unnamed cafe", dateISO); }} />
+        {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
       </div>
     </div>
   );
@@ -1835,7 +1836,7 @@ export default function App() {
     <div style={{ ...styles.app, background: currentTheme.bg }}>
       <div style={{ ...styles.phone, background: currentTheme.bg }}>
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
-        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => { setFromProfile(false); setScreen("profile"); }} pastCafes={[...new Set(logs.map(l => l.cafe))]} />}
+        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => { setFromProfile(false); setScreen("profile"); }} onSkip={() => setScreen("profile")} pastCafes={[...new Set(logs.map(l => l.cafe))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}
         {screen === "labels" && <LabelsScreen onNext={handleLabels} onBack={() => setScreen(isNewCafe ? "vibes" : "drink")} />}

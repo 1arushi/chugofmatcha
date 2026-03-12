@@ -954,13 +954,14 @@ function AvatarEditor({ avatar, setAvatar, theme, setTheme, username, onClose })
   );
 }
 
-function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnother, appTheme, setAppTheme, avatar, setAvatar, communityStats }) {
+function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCafes, userId, joinedDate, onLogAnother, appTheme, setAppTheme, avatar, setAvatar, communityStats }) {
   const C = useC();
   const [tab, setTab] = useState("cafe");
   const [listTab, setListTab] = useState("fave cafes");
   const [selectedCafe, setSelectedCafe] = useState(null);
   const [editingCafe, setEditingCafe] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState([]);
   const [showAvatar, setShowAvatar] = useState(false);
@@ -1251,25 +1252,42 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
                   ))}
                 </div>
               )}
-              {/* Delete cafe button */}
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 24, marginBottom: 8 }}>
-                <button onClick={() => {
-                  if (window.confirm(`delete all logs for ${selectedCafe}?`)) {
-                    setLogs(prev => prev.filter(l => l.cafe !== selectedCafe));
-                    setRankedCafes(prev => prev.filter(c => c !== selectedCafe));
-                    if (userId) {
-                      try {
-                        sb.patch("users", `id=eq.${userId}`, { ranked_cafes: rankedCafes.filter(c => c !== selectedCafe) }).catch(() => {});
-                        fetch(`${SUPABASE_URL}/rest/v1/logs?user_id=eq.${userId}&cafe=eq.${encodeURIComponent(selectedCafe)}`, {
-                          method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-                        }).catch(() => {});
-                      } catch(e) {}
-                    }
-                    setSelectedCafe(null);
-                    setEditingCafe(false);
-                  }
-                }} style={{ background: "none", border: "none", color: `${C.text}40`, fontSize: 22, cursor: "pointer", padding: "8px 16px", lineHeight: 1 }}>🗑</button>
-              </div>
+              {editingCafe && (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: 8, marginBottom: 8 }}>
+                  <button onClick={() => setConfirmDelete(true)}
+                    style={{ background: "none", border: "none", color: `${C.text}35`, fontSize: 20, cursor: "pointer", padding: "8px 20px", lineHeight: 1, fontFamily: "Inter, sans-serif", letterSpacing: "0.04em" }}>
+                    🗑
+                  </button>
+                </div>
+              )}
+              {confirmDelete && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+                  <div style={{ background: C.card, borderRadius: 24, padding: "28px 24px", margin: "0 32px", textAlign: "center" }}>
+                    <div style={{ color: C.text, fontSize: 16, marginBottom: 8 }}>delete {selectedCafe}?</div>
+                    <div style={{ color: C.textMuted, fontSize: 13, marginBottom: 24 }}>this removes all your logs for this cafe</div>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+                      <button onClick={() => setConfirmDelete(false)} style={{ background: "none", border: `2px solid ${C.border}`, borderRadius: 50, padding: "10px 24px", color: C.textMuted, fontSize: 14, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>cancel</button>
+                      <button onClick={async () => {
+                        const cafe = selectedCafe;
+                        setLogs(prev => prev.filter(l => l.cafe !== cafe));
+                        const newRanked = rankedCafes.filter(c => c !== cafe);
+                        setRankedCafes(newRanked);
+                        setSelectedCafe(null);
+                        setEditingCafe(false);
+                        setConfirmDelete(false);
+                        if (userId) {
+                          try {
+                            await sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked });
+                            await fetch(`${SUPABASE_URL}/rest/v1/logs?user_id=eq.${userId}&cafe=eq.${encodeURIComponent(cafe)}`, {
+                              method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+                            });
+                          } catch(e) {}
+                        }
+                      }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "10px 24px", color: C.textDark, fontSize: 14, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>delete</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         }
@@ -1850,7 +1868,7 @@ export default function App() {
         )}
         {screen === "profile" && (
           <>
-            <ProfileScreen username={username} logs={logs} rankedCafes={rankedCafes} joinedDate={joinedDate} onLogAnother={() => { setFromProfile(true); setScreen("cafe-entry"); }} appTheme={appTheme} setAppTheme={handleSetTheme} avatar={avatar} setAvatar={handleSetAvatar} communityStats={communityStats} />
+            <ProfileScreen username={username} logs={logs} setLogs={setLogs} rankedCafes={rankedCafes} setRankedCafes={setRankedCafes} userId={userId} joinedDate={joinedDate} onLogAnother={() => { setFromProfile(true); setScreen("cafe-entry"); }} appTheme={appTheme} setAppTheme={handleSetTheme} avatar={avatar} setAvatar={handleSetAvatar} communityStats={communityStats} />
           </>
         )}
       </div>

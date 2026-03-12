@@ -98,7 +98,9 @@ const styles = {
     position: "relative",
     display: "flex",
     flexDirection: "column",
-
+    transform: "scale(0.82)",
+    transformOrigin: "top center",
+    marginBottom: "-152px",
   },
   logo: {
     textAlign: "center",
@@ -341,7 +343,10 @@ function SignInScreen({ onLogin }) {
           theme: "green", ranked_cafes: [],
           email: email.trim() || null
         });
-        if (rows?.code) { setError("signup failed, try again"); setLoading(false); return; }
+        if (!rows || rows?.code || rows?.error || !Array.isArray(rows) || rows.length === 0) {
+          setError(`signup failed: ${JSON.stringify(rows)}`);
+          setLoading(false); return;
+        }
         onLogin(rows[0]);
       } else {
         const rows = await sb.get("users", `username=eq.${encodeURIComponent(username.trim())}&select=*`);

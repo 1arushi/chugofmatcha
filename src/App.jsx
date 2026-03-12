@@ -1004,7 +1004,7 @@ function ProfileScreen({ username, logs, rankedCafes = [], joinedDate, onLogAnot
   const maxDrinks = Math.max(...monthlyDrinks, 1);
 
   // Joined date label
-  const joinedLabel = joinedDate ? joinedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase() : "march 2026";
+  const joinedLabel = joinedDate ? (typeof joinedDate === "string" ? joinedDate : joinedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase()) : "march 2026";
 
   return (
     <div style={{ ...styles.screen, background: C.bg, padding: "0 0 0", position: "relative" }}>

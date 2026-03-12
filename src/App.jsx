@@ -1641,6 +1641,7 @@ export default function App() {
   const [logs, setLogs] = useState([]);
   const [currentLog, setCurrentLog] = useState({});
   const [isNewCafe, setIsNewCafe] = useState(false);
+  const isNewCafeRef = React.useRef(false);
   const [rankedCafes, setRankedCafes] = useState([]);
   const [joinedDate, setJoinedDate] = useState(new Date());
   const [fromProfile, setFromProfile] = useState(false);
@@ -1688,14 +1689,16 @@ export default function App() {
 
   const handleCafeEntry = (cafe, dateISO) => {
     const knownCafes = logs.map((l) => l.cafe);
-    setIsNewCafe(!knownCafes.includes(cafe));
+    const newCafe = !knownCafes.includes(cafe);
+    setIsNewCafe(newCafe);
+    isNewCafeRef.current = newCafe;
     setCurrentLog({ cafe, date: dateISO || new Date().toISOString().slice(0, 10) });
     setScreen("drink");
   };
 
   const handleDrink = (drinkData) => {
     setCurrentLog((prev) => ({ ...prev, ...drinkData }));
-    if (isNewCafe) {
+    if (isNewCafeRef.current) {
       setScreen("vibes");
     } else {
       // Returning visit — skip vibes & labels, carry over last known price

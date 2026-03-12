@@ -1139,7 +1139,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ color: C.text, fontSize: 26, fontWeight: "bold", lineHeight: 1 }}>{selectedCafe}</div>
-                  <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => l.cafe === selectedCafe && l.notes).map(l => l.notes).join(", ") }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
+                  <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => l.cafe === selectedCafe && l.notes).map(l => l.notes).join(", "), labels: [...d.allLabels] }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
                 </div>
                 <div style={{ color: C.textMuted, fontSize: 12, marginTop: 3, letterSpacing: "0.04em" }}>visited {d.visits}x</div>
               </div>
@@ -1173,13 +1173,21 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
                   </div>
 
                   <button onClick={async () => {
-                    setLogs(prev => prev.map(l => l.cafe !== selectedCafe ? l : {
-                      ...l,
-                      studyRating: editForm.studyRating ?? l.studyRating,
-                      drinkRating: editForm.drinkRating ?? l.drinkRating,
-                      avgPrice: editForm.avgPrice ?? l.avgPrice,
-                      notes: editForm.notes ?? l.notes,
-                    }));
+                    // Price edit only applies to future logs (add a priceOverride marker on the cafe)
+                    // Update ratings/notes/labels on all logs, but only update avgPrice on the latest log
+                    const cafeLogs = prev => prev.filter(l => l.cafe === selectedCafe);
+                    setLogs(prev => {
+                      const sorted = [...prev].sort((a,b) => new Date(b.date) - new Date(a.date));
+                      const latestIdx = sorted.findIndex(l => l.cafe === selectedCafe);
+                      return prev.map((l, i) => l.cafe !== selectedCafe ? l : {
+                        ...l,
+                        studyRating: editForm.studyRating ?? l.studyRating,
+                        drinkRating: editForm.drinkRating ?? l.drinkRating,
+                        avgPrice: l === sorted[latestIdx] ? (editForm.avgPrice ?? l.avgPrice) : l.avgPrice,
+                        notes: editForm.notes ?? l.notes,
+                        labels: editForm.labels ?? l.labels,
+                      });
+                    });
                     // Save to Supabase
                     if (userId) {
                       try {
@@ -1235,10 +1243,16 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
               </div>
 
               {/* Labels */}
-              {d.allLabels.length > 0 && (
+              {(editingCafe ? (editForm.labels||[]) : d.allLabels).length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-                  {d.allLabels.map(l => (
-                    <span key={l} style={{ background: C.card, border: `2px solid ${C.border}`, borderRadius: 50, padding: "7px 16px", color: C.text, fontSize: 12, letterSpacing: "0.03em" }}>{l}</span>
+                  {(editingCafe ? (editForm.labels||[]) : d.allLabels).map(l => (
+                    <span key={l} style={{ background: C.card, border: `2px solid ${C.border}`, borderRadius: 50, padding: "7px 16px", color: C.text, fontSize: 12, letterSpacing: "0.03em", display: "flex", alignItems: "center", gap: 6 }}>
+                      {l}
+                      {editingCafe && (
+                        <button onClick={() => setEditForm(f => ({ ...f, labels: (f.labels||[]).filter(x => x !== l) }))}
+                          style={{ background: "none", border: "none", color: C.textMuted, fontSize: 14, cursor: "pointer", padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+                      )}
+                    </span>
                   ))}
                 </div>
               )}

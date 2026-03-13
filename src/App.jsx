@@ -459,14 +459,14 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] })
           />
         </div>
 
-        {/* Quick links */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 20 }}>
-          {onSkip && <button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button>}
+        {/* Homemade link under date */}
+        <div style={{ textAlign: "center", marginTop: 20 }}>
           <button onClick={onHomemade} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>homemade →</button>
         </div>
       </div>
       <div style={{ paddingBottom: 40 }}>
         <NextBtn onClick={() => { setShowSuggestions(false); onNext(cafe || "unnamed cafe", dateISO); }} />
+        {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
       </div>
     </div>
   );
@@ -1637,7 +1637,7 @@ function HomemadeDrinkScreen({ onNext, onBack }) {
   const drinks = ["matcha", "hojicha", "tea", "coffee"];
 
   const toggleDrink = (d) =>
-    setSelectedDrinks(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+    setSelectedDrinks(prev => prev.includes(d) ? [] : [d]);
 
   const ingredientLabel = () => {
     if (selectedDrinks.includes("matcha") || selectedDrinks.includes("hojicha")) return "powder used";
@@ -1676,18 +1676,16 @@ function HomemadeDrinkScreen({ onNext, onBack }) {
           })}
         </div>
 
-        {/* Ingredient label */}
-        {selectedDrinks.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8, letterSpacing: "0.06em" }}>{ingredientLabel()}</div>
-            <input
-              placeholder=""
-              value={ingredient}
-              onChange={e => setIngredient(e.target.value)}
-              style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
-            />
-          </div>
-        )}
+        {/* Ingredient label - always visible */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8, letterSpacing: "0.06em" }}>{ingredientLabel()}</div>
+          <input
+            placeholder=""
+            value={ingredient}
+            onChange={e => setIngredient(e.target.value)}
+            style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
+          />
+        </div>
 
         {/* modifications/notes */}
         <div style={{ marginBottom: 16 }}>

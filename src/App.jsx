@@ -458,11 +458,15 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] })
             style={{ background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 13, letterSpacing: "0.06em", textAlign: "center", outline: "none", cursor: "pointer", padding: "2px 4px", colorScheme: "dark" }}
           />
         </div>
+
+        {/* Quick links */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 20 }}>
+          {onSkip && <button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button>}
+          <button onClick={onHomemade} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>homemade →</button>
+        </div>
       </div>
       <div style={{ paddingBottom: 40 }}>
         <NextBtn onClick={() => { setShowSuggestions(false); onNext(cafe || "unnamed cafe", dateISO); }} />
-        {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
-        <div style={{ textAlign: "center", marginTop: 12 }}><button onClick={onHomemade} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>homemade →</button></div>
       </div>
     </div>
   );
@@ -1992,7 +1996,7 @@ export default function App() {
     <div style={{ ...styles.app, background: currentTheme.bg }}>
       <div style={{ ...styles.phone, background: currentTheme.bg }}>
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
-        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => { setFromProfile(false); setScreen("profile"); }} onSkip={() => setScreen("profile")} pastCafes={[...new Set(logs.map(l => l.cafe))]} />}
+        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} pastCafes={[...new Set(logs.map(l => l.cafe).filter(c => c !== "homemade"))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
         {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}

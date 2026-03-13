@@ -405,7 +405,7 @@ function SignInScreen({ onLogin }) {
   );
 }
 
-function CafeEntryScreen({ onNext, onBack, onSkip, pastCafes = [] }) {
+function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] }) {
   const C = useC();
   const [cafe, setCafe] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -462,6 +462,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, pastCafes = [] }) {
       <div style={{ paddingBottom: 40 }}>
         <NextBtn onClick={() => { setShowSuggestions(false); onNext(cafe || "unnamed cafe", dateISO); }} />
         {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
+        <div style={{ textAlign: "center", marginTop: 12 }}><button onClick={onHomemade} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>homemade →</button></div>
       </div>
     </div>
   );
@@ -1621,6 +1622,98 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 }
 
 
+
+function HomemadeDrinkScreen({ onNext, onBack }) {
+  const C = useC();
+  const [selectedDrinks, setSelectedDrinks] = useState([]);
+  const [drinkName, setDrinkName] = useState("");
+  const [ingredient, setIngredient] = useState("");
+  const [notes, setNotes] = useState("");
+  const [rating, setRating] = useState(0);
+  const drinks = ["matcha", "hojicha", "tea", "coffee"];
+
+  const toggleDrink = (d) =>
+    setSelectedDrinks(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+
+  const ingredientLabel = () => {
+    if (selectedDrinks.includes("matcha") || selectedDrinks.includes("hojicha")) return "powder used";
+    if (selectedDrinks.includes("tea")) return "tea flavor";
+    if (selectedDrinks.includes("coffee")) return "brand";
+    return "ingredient";
+  };
+
+  return (
+    <div style={{ ...styles.screen, background: C.bg }}>
+      <Logo onBack={onBack} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 28px", overflowY: "auto" }}>
+        <Heading>what did you make?</Heading>
+
+        {/* Drink name input */}
+        <input
+          placeholder="name your drink"
+          value={drinkName}
+          onChange={e => setDrinkName(e.target.value)}
+          style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em", marginBottom: 20 }}
+        />
+
+        {/* Drink type grid - smaller */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+          {drinks.map(d => {
+            const active = selectedDrinks.includes(d);
+            return (
+              <button key={d} onClick={() => toggleDrink(d)} style={{
+                background: active ? C.cardLight : C.card,
+                border: active ? `2px solid ${C.text}` : "2px solid transparent",
+                borderRadius: 14, color: C.text, fontSize: 13,
+                fontFamily: "'Inter', sans-serif", padding: "18px 12px",
+                cursor: "pointer", transition: "all 0.15s", letterSpacing: "0.03em",
+              }}>{d}</button>
+            );
+          })}
+        </div>
+
+        {/* Ingredient label */}
+        {selectedDrinks.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8, letterSpacing: "0.06em" }}>{ingredientLabel()}</div>
+            <input
+              placeholder=""
+              value={ingredient}
+              onChange={e => setIngredient(e.target.value)}
+              style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
+            />
+          </div>
+        )}
+
+        {/* modifications/notes */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 8, letterSpacing: "0.04em" }}>modifications/notes</div>
+          <input
+            placeholder=""
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
+          />
+        </div>
+
+        {/* Star rating */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8, letterSpacing: "0.06em" }}>rate your drink</div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            {[1,2,3,4,5].map(s => (
+              <span key={s} onClick={() => setRating(s)} style={{ fontSize: 26, cursor: "pointer", color: s <= rating ? C.text : `${C.text}30`, transition: "color 0.1s" }}>★</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ paddingBottom: 40, paddingLeft: 28, paddingRight: 28 }}>
+        <NextBtn onClick={() => onNext({ drinks: selectedDrinks, drinkName: drinkName || "homemade", ingredient, notes, rating, isHomemade: true, chugs: 1 })} />
+      </div>
+    </div>
+  );
+}
+
 function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
   const C = useC();
   // We do head-to-head: newCafe vs each existing ranked cafe one at a time
@@ -1727,6 +1820,7 @@ export default function App() {
   const [currentLog, setCurrentLog] = useState({});
   const [isNewCafe, setIsNewCafe] = useState(false);
   const isNewCafeRef = React.useRef(false);
+  const [isHomemade, setIsHomemade] = useState(false);
   const [rankedCafes, setRankedCafes] = useState([]);
   const [joinedDate, setJoinedDate] = useState(new Date());
   const [fromProfile, setFromProfile] = useState(false);
@@ -1852,6 +1946,32 @@ export default function App() {
   };
 
   // Save avatar + theme changes to Supabase
+  const handleHomemadeDone = (drinkData) => {
+    const dateISO = new Date().toISOString().slice(0, 10);
+    const log = { cafe: "homemade", date: dateISO, ...drinkData };
+    setLogs(prev => [...prev, log]);
+    setCurrentLog(log);
+    if (userId) {
+      sb.post("logs", {
+        user_id: userId, username,
+        cafe: "homemade", date: dateISO,
+        drinks: drinkData.drinks, chugs: 1,
+        notes: drinkData.notes, avg_price: null,
+        labels: [], study_rating: null,
+        drink_rating: drinkData.rating,
+        drink_name: drinkData.drinkName,
+        ingredient: drinkData.ingredient,
+      }).catch(() => {});
+    }
+    // rank only against other homemade entries
+    const alreadyRankedHomemade = rankedCafes.includes("homemade");
+    if (!alreadyRankedHomemade) {
+      setScreen("ranking-homemade");
+    } else {
+      setScreen("profile");
+    }
+  };
+
   const handleSetAvatar = (val) => {
     setAvatar(val);
     if (userId) sb.patch("users", `id=eq.${userId}`, { avatar: val }).catch(() => {});
@@ -1874,6 +1994,7 @@ export default function App() {
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
         {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => { setFromProfile(false); setScreen("profile"); }} onSkip={() => setScreen("profile")} pastCafes={[...new Set(logs.map(l => l.cafe))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
+        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}
         {screen === "labels" && <LabelsScreen onNext={handleLabels} onBack={() => setScreen(isNewCafe ? "vibes" : "drink")} />}
         {screen === "ranking" && (
@@ -1882,6 +2003,14 @@ export default function App() {
             rankedCafes={rankedCafes}
             onDone={handleRankingDone}
             onBack={() => setScreen("labels")}
+          />
+        )}
+        {screen === "ranking-homemade" && (
+          <RankingScreen
+            newCafe={currentLog.drinkName || "homemade"}
+            rankedCafes={rankedCafes.filter(c => c === "homemade" || logs.find(l => l.drinkName === c && l.isHomemade))}
+            onDone={(newRanked) => { setRankedCafes(newRanked); setCurrentLog({}); setScreen("profile"); if (userId) sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked }).catch(() => {}); }}
+            onBack={() => setScreen("homemade")}
           />
         )}
         {screen === "profile" && (

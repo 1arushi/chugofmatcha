@@ -1128,7 +1128,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           })(),
           "homemade": sortedHomemade,
         };
-        const listTabs = ["fave cafes", "most visited", "best study", "homemade"];
+        const listTabs = ["fave cafes", "most visited", "homemade"];
         const activeList = listDefs[listTab] || [];
 
         // Build cafe detail from all logs for that cafe
@@ -1160,9 +1160,32 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           return (
             <div style={{ ...styles.screen, background: C.bg, padding: "0 28px", overflowY: "auto" }}>
               <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "52px 0 24px" }}>
-                <button onClick={() => setSelectedHomemade(null)} style={{ position: "absolute", left: 0, background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
+                <button onClick={() => { setSelectedHomemade(null); setEditingCafe(false); }} style={{ position: "absolute", left: 0, background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
                 <div style={{ color: C.text, fontSize: 22, fontWeight: "bold" }}>{selectedHomemade}</div>
+                <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ ingredient, notes: allNotes.join(", "), rating: bestRating }); }} style={{ position: "absolute", right: 0, background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>✎</button>
               </div>
+
+              {editingCafe && (
+                <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 14 }}>
+                  <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 6 }}>{ingredientLabel}</div>
+                  <input value={editForm.ingredient || ""} onChange={e => setEditForm(f => ({...f, ingredient: e.target.value}))}
+                    style={{ background: C.cardLight, border: "none", borderRadius: 50, padding: "10px 16px", color: C.text, fontSize: 13, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", marginBottom: 12 }} />
+                  <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 6 }}>notes</div>
+                  <input value={editForm.notes || ""} onChange={e => setEditForm(f => ({...f, notes: e.target.value}))}
+                    style={{ background: C.cardLight, border: "none", borderRadius: 50, padding: "10px 16px", color: C.text, fontSize: 13, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", marginBottom: 12 }} />
+                  <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 8, textAlign: "center" }}>rating</div>
+                  <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 14 }}>
+                    {[1,2,3,4,5].map(s => (
+                      <span key={s} onClick={() => setEditForm(f => ({...f, rating: s}))} style={{ fontSize: 22, cursor: "pointer", color: s <= (editForm.rating||0) ? C.text : `${C.text}30` }}>★</span>
+                    ))}
+                  </div>
+                  <button onClick={async () => {
+                    setLogs(prev => prev.map(l => l.isHomemade && l.drinkName === selectedHomemade ? { ...l, ingredient: editForm.ingredient, notes: editForm.notes, drinkRating: editForm.rating } : l));
+                    if (userId) await sb.patch("logs", `user_id=eq.${userId}&cafe=eq.homemade`, { ingredient: editForm.ingredient, notes: editForm.notes, drink_rating: editForm.rating }).catch(() => {});
+                    setEditingCafe(false);
+                  }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "10px 24px", color: C.textDark, fontSize: 13, cursor: "pointer", fontFamily: "Inter, sans-serif", width: "100%" }}>save</button>
+                </div>
+              )}
 
               {/* Rating */}
               {bestRating > 0 && (
@@ -1409,6 +1432,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
             {/* Filter panel */}
             {showFilters && (() => {
               const filterOptions = [
+                { id: "best-study", label: "best study" },
                 { id: "outlets", label: "outlets" },
                 { id: "wifi", label: "wifi" },
                 { id: "bathroom", label: "bathroom" },
@@ -1718,14 +1742,28 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 
 
 
-function HomemadeDrinkScreen({ onNext, onBack }) {
+function HomemadeDrinkScreen({ onNext, onBack, pastDrinks = [] }) {
   const C = useC();
   const [selectedDrinks, setSelectedDrinks] = useState([]);
   const [drinkName, setDrinkName] = useState("");
   const [ingredient, setIngredient] = useState("");
   const [notes, setNotes] = useState("");
   const [rating, setRating] = useState(0);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const drinks = ["matcha", "hojicha", "tea", "coffee"];
+
+  const suggestions = drinkName.trim().length > 0
+    ? pastDrinks.filter(d => d.name.toLowerCase().includes(drinkName.toLowerCase()))
+    : [];
+
+  const autofill = (d) => {
+    setDrinkName(d.name);
+    setSelectedDrinks(d.drinks || []);
+    setIngredient(d.ingredient || "");
+    setNotes(d.notes || "");
+    setRating(d.rating || 0);
+    setShowSuggestions(false);
+  };
 
   const toggleDrink = (d) =>
     setSelectedDrinks(prev => prev.includes(d) ? [] : [d]);
@@ -1743,13 +1781,27 @@ function HomemadeDrinkScreen({ onNext, onBack }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 28px", overflowY: "auto" }}>
         <Heading>what did you make?</Heading>
 
-        {/* Drink name input */}
-        <input
-          placeholder="name your drink"
-          value={drinkName}
-          onChange={e => setDrinkName(e.target.value)}
-          style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em", marginBottom: 20 }}
-        />
+        {/* Drink name input with autocomplete */}
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <input
+            placeholder="name your drink"
+            value={drinkName}
+            onChange={e => { setDrinkName(e.target.value); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: C.cardLight, borderRadius: 16, overflow: "hidden", zIndex: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
+              {suggestions.map(d => (
+                <div key={d.name} onClick={() => autofill(d)} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em" }}
+                  onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  {d.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Drink type grid - smaller */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -2084,7 +2136,7 @@ export default function App() {
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
         {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} pastCafes={[...new Set(logs.map(l => l.cafe).filter(c => c !== "homemade"))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
-        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} />}
+        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} pastDrinks={[...new Map(logs.filter(l => l.isHomemade && l.drinkName).map(l => [l.drinkName, { name: l.drinkName, drinks: l.drinks, ingredient: l.ingredient, notes: l.notes, rating: l.drinkRating || l.rating || 0 }])).values()]} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}
         {screen === "labels" && <LabelsScreen onNext={handleLabels} onBack={() => setScreen(isNewCafe ? "vibes" : "drink")} />}
         {screen === "ranking" && (

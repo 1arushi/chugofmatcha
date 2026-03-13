@@ -1967,13 +1967,8 @@ export default function App() {
         ingredient: drinkData.ingredient,
       }).catch(() => {});
     }
-    // rank only against other homemade entries
-    const alreadyRankedHomemade = rankedCafes.includes("homemade");
-    if (!alreadyRankedHomemade) {
-      setScreen("ranking-homemade");
-    } else {
-      setScreen("profile");
-    }
+    // Always rank new homemade drink against previously ranked homemade drinks
+    setScreen("ranking-homemade");
   };
 
   const handleSetAvatar = (val) => {
@@ -2009,14 +2004,27 @@ export default function App() {
             onBack={() => setScreen("labels")}
           />
         )}
-        {screen === "ranking-homemade" && (
-          <RankingScreen
-            newCafe={currentLog.drinkName || "homemade"}
-            rankedCafes={rankedCafes.filter(c => c === "homemade" || logs.find(l => l.drinkName === c && l.isHomemade))}
-            onDone={(newRanked) => { setRankedCafes(newRanked); setCurrentLog({}); setScreen("profile"); if (userId) sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked }).catch(() => {}); }}
-            onBack={() => setScreen("homemade")}
-          />
-        )}
+        {screen === "ranking-homemade" && (() => {
+          // Build ranked list of homemade drink names only
+          const homemadeNames = [...new Set(logs.filter(l => l.isHomemade && l.drinkName).map(l => l.drinkName))];
+          const rankedHomemade = rankedCafes.filter(c => homemadeNames.includes(c) && c !== (currentLog.drinkName || "homemade"));
+          return (
+            <RankingScreen
+              newCafe={currentLog.drinkName || "homemade"}
+              rankedCafes={rankedHomemade}
+              onDone={(newRanked) => {
+                // Merge: keep cafe rankings, replace homemade rankings
+                const cafeRanks = rankedCafes.filter(c => !homemadeNames.includes(c));
+                const merged = [...cafeRanks, ...newRanked];
+                setRankedCafes(merged);
+                setCurrentLog({});
+                setScreen("profile");
+                if (userId) sb.patch("users", `id=eq.${userId}`, { ranked_cafes: merged }).catch(() => {});
+              }}
+              onBack={() => setScreen("homemade")}
+            />
+          );
+        })()}
         {screen === "profile" && (
           <>
             <ProfileScreen username={username} logs={logs} setLogs={setLogs} rankedCafes={rankedCafes} setRankedCafes={setRankedCafes} userId={userId} joinedDate={joinedDate} onLogAnother={() => { setFromProfile(true); setScreen("cafe-entry"); }} appTheme={appTheme} setAppTheme={handleSetTheme} avatar={avatar} setAvatar={handleSetAvatar} communityStats={communityStats} />

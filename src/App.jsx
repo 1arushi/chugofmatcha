@@ -1676,16 +1676,18 @@ function HomemadeDrinkScreen({ onNext, onBack }) {
           })}
         </div>
 
-        {/* Ingredient label - always visible */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8, letterSpacing: "0.06em" }}>{ingredientLabel()}</div>
-          <input
-            placeholder=""
-            value={ingredient}
-            onChange={e => setIngredient(e.target.value)}
-            style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
-          />
-        </div>
+        {/* Ingredient label - shows after drink selected */}
+        {selectedDrinks.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8, letterSpacing: "0.06em" }}>{ingredientLabel()}</div>
+            <input
+              placeholder=""
+              value={ingredient}
+              onChange={e => setIngredient(e.target.value)}
+              style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
+            />
+          </div>
+        )}
 
         {/* modifications/notes */}
         <div style={{ marginBottom: 16 }}>

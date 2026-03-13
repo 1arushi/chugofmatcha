@@ -970,6 +970,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
   const [tab, setTab] = useState("cafe");
   const [listTab, setListTab] = useState("fave cafes");
   const [selectedCafe, setSelectedCafe] = useState(null);
+  const [selectedHomemade, setSelectedHomemade] = useState(null);
   const [editingCafe, setEditingCafe] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1099,12 +1100,24 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 
       {/* Your Lists Tab */}
       {tab === "your lists" && (() => {
+        // Separate homemade from cafe logs
+        const homemadeLogs = logs.filter(l => l.isHomemade);
+        const homemadeNames = [...new Set(homemadeLogs.map(l => l.drinkName).filter(Boolean))];
+        const rankedHomemade = rankedCafes.filter(c => homemadeNames.includes(c));
+        const unrankedHomemade = homemadeNames.filter(c => !rankedCafes.includes(c));
+        const sortedHomemade = [...rankedHomemade, ...unrankedHomemade];
+
+        const cafeLogs2 = logs.filter(l => !l.isHomemade && l.cafe !== "homemade");
+        const uniqueCafesOnly = [...new Set(cafeLogs2.map(l => l.cafe))];
+        const cafeCountOnly = (name) => cafeLogs2.filter(l => l.cafe === name).length;
+        const sortedCafesOnly = [...uniqueCafesOnly].sort((a, b) => cafeCountOnly(b) - cafeCountOnly(a));
+
         const listDefs = {
-          "fave cafes": (() => { const ranked = rankedCafes.filter(c => uniqueCafes.includes(c)); const unranked = uniqueCafes.filter(c => !rankedCafes.includes(c)); return [...ranked, ...unranked]; })(),
-          "most visited": sortedCafes,
+          "fave cafes": (() => { const ranked = rankedCafes.filter(c => uniqueCafesOnly.includes(c)); const unranked = uniqueCafesOnly.filter(c => !rankedCafes.includes(c)); return [...ranked, ...unranked]; })(),
+          "most visited": sortedCafesOnly,
           "best study": (() => {
             const cafeStudy = {};
-            logs.forEach(l => { if (l.studyRating > 0 && (!cafeStudy[l.cafe] || l.studyRating > cafeStudy[l.cafe])) cafeStudy[l.cafe] = l.studyRating; });
+            cafeLogs2.forEach(l => { if (l.studyRating > 0 && (!cafeStudy[l.cafe] || l.studyRating > cafeStudy[l.cafe])) cafeStudy[l.cafe] = l.studyRating; });
             return Object.keys(cafeStudy).sort((a, b) => {
               if (cafeStudy[b] !== cafeStudy[a]) return cafeStudy[b] - cafeStudy[a];
               const ri = rankedCafes.indexOf(a), rj = rankedCafes.indexOf(b);
@@ -1113,8 +1126,9 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
               return ri - rj;
             });
           })(),
+          "homemade": sortedHomemade,
         };
-        const listTabs = ["fave cafes", "most visited", "best study"];
+        const listTabs = ["fave cafes", "most visited", "best study", "homemade"];
         const activeList = listDefs[listTab] || [];
 
         // Build cafe detail from all logs for that cafe
@@ -1134,6 +1148,64 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           const allNotes = cafeLogs.map(l => l.notes).filter(n => n && n.trim().length > 0);
           return { visits, bestStudy, bestDrink, avgP, totalSpentCafe, hasOutlets, hasWifi, hasBathroom, allLabels, allNotes };
         };
+
+        if (selectedHomemade) {
+          const dLogs = logs.filter(l => l.isHomemade && l.drinkName === selectedHomemade);
+          const latest = dLogs.sort((a,b) => new Date(b.date) - new Date(a.date))[0] || {};
+          const bestRating = Math.max(...dLogs.map(l => l.drinkRating || l.rating || 0), 0);
+          const allNotes = [...new Set(dLogs.map(l => l.notes).filter(Boolean))];
+          const drinkType = latest.drinks?.[0] || "";
+          const ingredient = latest.ingredient || "";
+          const ingredientLabel = drinkType === "matcha" || drinkType === "hojicha" ? "powder used" : drinkType === "tea" ? "tea flavor" : drinkType === "coffee" ? "brand" : "ingredient";
+          return (
+            <div style={{ ...styles.screen, background: C.bg, padding: "0 28px", overflowY: "auto" }}>
+              <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "52px 0 24px" }}>
+                <button onClick={() => setSelectedHomemade(null)} style={{ position: "absolute", left: 0, background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
+                <div style={{ color: C.text, fontSize: 22, fontWeight: "bold" }}>{selectedHomemade}</div>
+              </div>
+
+              {/* Rating */}
+              {bestRating > 0 && (
+                <div style={{ textAlign: "center", marginBottom: 24 }}>
+                  {"★".repeat(bestRating).split("").map((s,i) => (
+                    <span key={i} style={{ fontSize: 24, color: C.text }}>{s}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* Drink type pill */}
+              {drinkType && (
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                  <span style={{ background: C.card, border: `2px solid ${C.border}`, borderRadius: 50, padding: "6px 18px", color: C.text, fontSize: 12, letterSpacing: "0.03em" }}>{drinkType}</span>
+                </div>
+              )}
+
+              {/* Ingredient */}
+              {ingredient && (
+                <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 14 }}>
+                  <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 6 }}>{ingredientLabel}</div>
+                  <div style={{ color: C.text, fontSize: 15 }}>{ingredient}</div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {allNotes.length > 0 && (
+                <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 14 }}>
+                  <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 6 }}>notes</div>
+                  {allNotes.map((n, i) => (
+                    <div key={i} style={{ color: C.text, fontSize: 14, marginBottom: i < allNotes.length - 1 ? 6 : 0 }}>{n}</div>
+                  ))}
+                </div>
+              )}
+
+              {/* Times made */}
+              <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 14, textAlign: "center" }}>
+                <div style={{ color: C.textMuted, fontSize: 28, fontWeight: "700", lineHeight: 1 }}>{dLogs.length}</div>
+                <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em", marginTop: 4 }}>times made</div>
+              </div>
+            </div>
+          );
+        }
 
         if (selectedCafe) {
           const d = getCafeDetail(selectedCafe);
@@ -1390,18 +1462,37 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
                 return filteredList.length === 0 ? (
                 <div style={{ color: C.textMuted, fontSize: 13, textAlign: "center", marginTop: 40 }}>{activeList.length === 0 ? "nothing here yet" : "no cafes match these filters"}</div>
               ) : (
-                filteredList.map((cafe, i) => (
-                  <div key={cafe + i} onClick={() => setSelectedCafe(cafe)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `1px solid ${C.border}`, color: C.text, cursor: "pointer" }}>
-                    <span style={{ color: C.textMuted, fontSize: 13, marginRight: 12, minWidth: 20 }}>{i + 1}</span>
-                    <span style={{ flex: 1, fontSize: 14 }}>{cafe}</span>
-                    {listTab === "best study" ? (
-                      <span style={{ color: C.textMuted, fontSize: 13 }}>{"★".repeat(Math.max(...logs.filter(l => l.cafe === cafe && l.studyRating > 0).map(l => l.studyRating), 0))}</span>
-                    ) : (
-                      <span style={{ color: C.textMuted, fontSize: 13 }}>{cafeCount(cafe)}</span>
-                    )}
-                    <span style={{ color: C.textMuted, fontSize: 16, marginLeft: 8 }}>›</span>
-                  </div>
-                ))
+                filteredList.map((cafe, i) => {
+                  if (listTab === "homemade") {
+                    const drinkLog = homemadeLogs.filter(l => l.drinkName === cafe);
+                    const bestRating = Math.max(...drinkLog.map(l => l.drinkRating || l.rating || 0), 0);
+                    const drinkType = drinkLog[0]?.drinks?.[0] || "";
+                    const ingredient = drinkLog[0]?.ingredient || "";
+                    return (
+                      <div key={cafe + i} onClick={() => setSelectedHomemade(cafe)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `1px solid ${C.border}`, color: C.text, cursor: "pointer" }}>
+                        <span style={{ color: C.textMuted, fontSize: 13, marginRight: 12, minWidth: 20 }}>{i + 1}</span>
+                        <span style={{ flex: 1, fontSize: 14 }}>
+                          {cafe}
+                          {ingredient ? <span style={{ color: C.textMuted, fontSize: 11, marginLeft: 6 }}>· {ingredient}</span> : null}
+                        </span>
+                        {bestRating > 0 && <span style={{ color: C.textMuted, fontSize: 12 }}>{"★".repeat(bestRating)}</span>}
+                        <span style={{ color: C.textMuted, fontSize: 16, marginLeft: 8 }}>›</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={cafe + i} onClick={() => setSelectedCafe(cafe)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `1px solid ${C.border}`, color: C.text, cursor: "pointer" }}>
+                      <span style={{ color: C.textMuted, fontSize: 13, marginRight: 12, minWidth: 20 }}>{i + 1}</span>
+                      <span style={{ flex: 1, fontSize: 14 }}>{cafe}</span>
+                      {listTab === "best study" ? (
+                        <span style={{ color: C.textMuted, fontSize: 13 }}>{"★".repeat(Math.max(...logs.filter(l => l.cafe === cafe && l.studyRating > 0).map(l => l.studyRating), 0))}</span>
+                      ) : (
+                        <span style={{ color: C.textMuted, fontSize: 13 }}>{cafeCount(cafe)}</span>
+                      )}
+                      <span style={{ color: C.textMuted, fontSize: 16, marginLeft: 8 }}>›</span>
+                    </div>
+                  );
+                })
               );
               })()}
             </div>

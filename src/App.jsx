@@ -2011,7 +2011,10 @@ export default function App() {
           cafe: l.cafe, date: l.date, drinks: l.drinks || [],
           chugs: l.chugs, notes: l.notes, amenities: l.amenities || [],
           studyRating: l.study_rating, drinkRating: l.drink_rating,
-          avgPrice: l.avg_price, labels: l.labels || []
+          avgPrice: l.avg_price, labels: l.labels || [],
+          drinkName: l.drink_name || null,
+          ingredient: l.ingredient || null,
+          isHomemade: l.cafe === "homemade" || !!l.drink_name,
         })));
       }
     } catch(e) {}

@@ -1102,7 +1102,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
       {tab === "your lists" && (() => {
         // Separate homemade from cafe logs
         const homemadeLogs = logs.filter(l => l.isHomemade);
-        const homemadeNames = [...new Set(homemadeLogs.map(l => l.drinkName).filter(Boolean))];
+        const homemadeNames = [...new Set(homemadeLogs.map(l => l.cafe).filter(Boolean))];
         const rankedHomemade = rankedCafes.filter(c => homemadeNames.includes(c));
         const unrankedHomemade = homemadeNames.filter(c => !rankedCafes.includes(c));
         const sortedHomemade = [...rankedHomemade, ...unrankedHomemade];
@@ -1150,7 +1150,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
         };
 
         if (selectedHomemade) {
-          const dLogs = logs.filter(l => l.isHomemade && l.drinkName === selectedHomemade);
+          const dLogs = logs.filter(l => l.isHomemade && l.cafe === selectedHomemade);
           const latest = dLogs.sort((a,b) => new Date(b.date) - new Date(a.date))[0] || {};
           const bestRating = Math.max(...dLogs.map(l => l.drinkRating || l.rating || 0), 0);
           const allNotes = [...new Set(dLogs.map(l => l.notes).filter(Boolean))];
@@ -1180,8 +1180,8 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
                     ))}
                   </div>
                   <button onClick={async () => {
-                    setLogs(prev => prev.map(l => l.isHomemade && l.drinkName === selectedHomemade ? { ...l, ingredient: editForm.ingredient, notes: editForm.notes, drinkRating: editForm.rating } : l));
-                    if (userId) await sb.patch("logs", `user_id=eq.${userId}&cafe=eq.homemade`, { ingredient: editForm.ingredient, notes: editForm.notes, drink_rating: editForm.rating }).catch(() => {});
+                    setLogs(prev => prev.map(l => l.isHomemade && l.cafe === selectedHomemade ? { ...l, ingredient: editForm.ingredient, notes: editForm.notes, drinkRating: editForm.rating } : l));
+                    if (userId) await sb.patch("logs", `user_id=eq.${userId}&cafe=eq.${encodeURIComponent(selectedHomemade)}`, { ingredient: editForm.ingredient, notes: editForm.notes, drink_rating: editForm.rating }).catch(() => {});
                     setEditingCafe(false);
                   }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "10px 24px", color: C.textDark, fontSize: 13, cursor: "pointer", fontFamily: "Inter, sans-serif", width: "100%" }}>save</button>
                 </div>
@@ -1488,7 +1488,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
               ) : (
                 filteredList.map((cafe, i) => {
                   if (listTab === "homemade") {
-                    const drinkLog = homemadeLogs.filter(l => l.drinkName === cafe);
+                    const drinkLog = homemadeLogs.filter(l => l.cafe === cafe);
                     const bestRating = Math.max(...drinkLog.map(l => l.drinkRating || l.rating || 0), 0);
                     const drinkType = drinkLog[0]?.drinks?.[0] || "";
                     const ingredient = drinkLog[0]?.ingredient || "";
@@ -1752,20 +1752,20 @@ function HomemadeDrinkScreen({ onNext, onBack, allHomemadeLogs = [] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const drinks = ["matcha", "hojicha", "tea", "coffee"];
 
-  // Build unique past drinks from logs
-  const pastNames = [...new Set(allHomemadeLogs.map(l => l.drinkName || l.drink_name).filter(Boolean))];
+  // Build unique past drink names
+  const pastNames = [...new Set(allHomemadeLogs.map(l => l.cafe).filter(Boolean))];
 
   const suggestions = drinkName.trim().length > 0
     ? pastNames.filter(n => n.toLowerCase().includes(drinkName.toLowerCase()))
     : [];
 
   const autofill = (name) => {
-    const match = allHomemadeLogs.find(l => (l.drinkName || l.drink_name) === name);
+    const match = allHomemadeLogs.find(l => l.cafe === name);
     if (match) {
       setSelectedDrinks(match.drinks || []);
       setIngredient(match.ingredient || "");
       setNotes(match.notes || "");
-      setRating(match.drinkRating || match.rating || 0);
+      setRating(match.drinkRating || 0);
     }
     setDrinkName(name);
     setShowSuggestions(false);
@@ -1861,7 +1861,7 @@ function HomemadeDrinkScreen({ onNext, onBack, allHomemadeLogs = [] }) {
       </div>
 
       <div style={{ paddingBottom: 40, paddingLeft: 28, paddingRight: 28 }}>
-        <NextBtn onClick={() => onNext({ drinks: selectedDrinks, drinkName: drinkName || "homemade", ingredient, notes, rating, isHomemade: true, chugs: 1 })} />
+        <NextBtn onClick={() => onNext({ drinks: selectedDrinks, drinkName: drinkName || "homemade", ingredient, notes, rating })} />
       </div>
     </div>
   );
@@ -2018,9 +2018,8 @@ export default function App() {
           chugs: l.chugs, notes: l.notes, amenities: l.amenities || [],
           studyRating: l.study_rating, drinkRating: l.drink_rating,
           avgPrice: l.avg_price, labels: l.labels || [],
-          drinkName: l.drink_name || null,
           ingredient: l.ingredient || null,
-          isHomemade: l.cafe === "homemade" || !!l.drink_name,
+          isHomemade: l.is_homemade || false,
         })));
       }
     } catch(e) {}
@@ -2105,22 +2104,24 @@ export default function App() {
   // Save avatar + theme changes to Supabase
   const handleHomemadeDone = (drinkData) => {
     const dateISO = new Date().toISOString().slice(0, 10);
-    const log = { cafe: "homemade", date: dateISO, ...drinkData };
+    const cafeName = drinkData.drinkName || "homemade";
+    const log = { cafe: cafeName, date: dateISO, drinks: drinkData.drinks, chugs: 1,
+      notes: drinkData.notes, ingredient: drinkData.ingredient,
+      drinkRating: drinkData.rating, isHomemade: true, labels: [], amenities: [] };
     setLogs(prev => [...prev, log]);
     setCurrentLog(log);
     if (userId) {
       sb.post("logs", {
         user_id: userId, username,
-        cafe: "homemade", date: dateISO,
+        cafe: cafeName, date: dateISO,
         drinks: drinkData.drinks, chugs: 1,
         notes: drinkData.notes, avg_price: null,
         labels: [], study_rating: null,
         drink_rating: drinkData.rating,
-        drink_name: drinkData.drinkName,
         ingredient: drinkData.ingredient,
+        is_homemade: true,
       }).catch(() => {});
     }
-    // Always rank new homemade drink against previously ranked homemade drinks
     setScreen("ranking-homemade");
   };
 
@@ -2144,9 +2145,9 @@ export default function App() {
     <div style={{ ...styles.app, background: currentTheme.bg }}>
       <div style={{ ...styles.phone, background: currentTheme.bg }}>
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
-        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} pastCafes={[...new Set(logs.map(l => l.cafe).filter(c => c !== "homemade"))]} />}
+        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} pastCafes={[...new Set(logs.filter(l => !l.isHomemade).map(l => l.cafe))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
-        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} allHomemadeLogs={logs.filter(l => l.isHomemade || l.cafe === "homemade")} />}
+        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} allHomemadeLogs={logs.filter(l => l.isHomemade)} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}
         {screen === "labels" && <LabelsScreen onNext={handleLabels} onBack={() => setScreen(isNewCafe ? "vibes" : "drink")} />}
         {screen === "ranking" && (
@@ -2158,15 +2159,13 @@ export default function App() {
           />
         )}
         {screen === "ranking-homemade" && (() => {
-          // Build ranked list of homemade drink names only
-          const homemadeNames = [...new Set(logs.filter(l => l.isHomemade && l.drinkName).map(l => l.drinkName))];
-          const rankedHomemade = rankedCafes.filter(c => homemadeNames.includes(c) && c !== (currentLog.drinkName || "homemade"));
+          const homemadeNames = [...new Set(logs.filter(l => l.isHomemade).map(l => l.cafe))];
+          const rankedHomemade = rankedCafes.filter(c => homemadeNames.includes(c) && c !== currentLog.cafe);
           return (
             <RankingScreen
-              newCafe={currentLog.drinkName || "homemade"}
+              newCafe={currentLog.cafe || "homemade"}
               rankedCafes={rankedHomemade}
               onDone={(newRanked) => {
-                // Merge: keep cafe rankings, replace homemade rankings
                 const cafeRanks = rankedCafes.filter(c => !homemadeNames.includes(c));
                 const merged = [...cafeRanks, ...newRanked];
                 setRankedCafes(merged);

@@ -619,7 +619,7 @@ function DrinkScreen({ onNext, onBack }) {
       <Logo onBack={onBack} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
         <Heading>what did you get?</Heading>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "0 28px" }}>
           {drinks.map((d) => (
             <button
               key={d}
@@ -633,14 +633,14 @@ function DrinkScreen({ onNext, onBack }) {
                 fontFamily: "'Inter', sans-serif",
                 aspectRatio: "1 / 1",
                 width: "100%",
-                padding: "0 12px 14px",
+                padding: "12px",
                 textAlign: "center",
                 cursor: "pointer",
                 transition: "all 0.15s",
                 letterSpacing: "0.03em",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "flex-end",
+                justifyContent: "center",
                 alignItems: "center",
               }}
             >
@@ -1924,18 +1924,19 @@ function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
                 border: "2px solid transparent",
                 borderRadius: 18,
                 color: C.text,
-                fontSize: 15,
+                fontSize: 18,
                 fontFamily: "'Inter', sans-serif",
                 aspectRatio: "1 / 1",
                 width: "100%",
-                padding: "0 12px 14px",
+                padding: "12px",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "flex-end",
+                justifyContent: "center",
                 alignItems: "center",
                 cursor: "pointer",
                 transition: "all 0.15s",
                 letterSpacing: "0.03em",
+                textAlign: "center",
               }}
               onMouseEnter={e => e.currentTarget.style.background = C.cardLight}
               onMouseLeave={e => e.currentTarget.style.background = C.card}

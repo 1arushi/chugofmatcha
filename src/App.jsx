@@ -1742,7 +1742,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 
 
 
-function HomemadeDrinkScreen({ onNext, onBack, pastDrinks = [] }) {
+function HomemadeDrinkScreen({ onNext, onBack, allHomemadeLogs = [] }) {
   const C = useC();
   const [selectedDrinks, setSelectedDrinks] = useState([]);
   const [drinkName, setDrinkName] = useState("");
@@ -1752,16 +1752,22 @@ function HomemadeDrinkScreen({ onNext, onBack, pastDrinks = [] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const drinks = ["matcha", "hojicha", "tea", "coffee"];
 
+  // Build unique past drinks from logs
+  const pastNames = [...new Set(allHomemadeLogs.map(l => l.drinkName || l.drink_name).filter(Boolean))];
+
   const suggestions = drinkName.trim().length > 0
-    ? pastDrinks.filter(d => d.name.toLowerCase().includes(drinkName.toLowerCase()))
+    ? pastNames.filter(n => n.toLowerCase().includes(drinkName.toLowerCase()))
     : [];
 
-  const autofill = (d) => {
-    setDrinkName(d.name);
-    setSelectedDrinks(d.drinks || []);
-    setIngredient(d.ingredient || "");
-    setNotes(d.notes || "");
-    setRating(d.rating || 0);
+  const autofill = (name) => {
+    const match = allHomemadeLogs.find(l => (l.drinkName || l.drink_name) === name);
+    if (match) {
+      setSelectedDrinks(match.drinks || []);
+      setIngredient(match.ingredient || "");
+      setNotes(match.notes || "");
+      setRating(match.drinkRating || match.rating || 0);
+    }
+    setDrinkName(name);
     setShowSuggestions(false);
   };
 
@@ -1792,11 +1798,11 @@ function HomemadeDrinkScreen({ onNext, onBack, pastDrinks = [] }) {
           />
           {showSuggestions && suggestions.length > 0 && (
             <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: C.cardLight, borderRadius: 16, overflow: "hidden", zIndex: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
-              {suggestions.map(d => (
-                <div key={d.name} onClick={() => autofill(d)} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em" }}
+              {suggestions.map(name => (
+                <div key={name} onClick={() => autofill(name)} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em" }}
                   onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  {d.name}
+                  {name}
                 </div>
               ))}
             </div>
@@ -2140,7 +2146,7 @@ export default function App() {
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
         {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} pastCafes={[...new Set(logs.map(l => l.cafe).filter(c => c !== "homemade"))]} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
-        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} pastDrinks={[...new Map(logs.filter(l => l.isHomemade && l.drinkName).map(l => [l.drinkName, { name: l.drinkName, drinks: l.drinks, ingredient: l.ingredient, notes: l.notes, rating: l.drinkRating || l.rating || 0 }])).values()]} />}
+        {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} allHomemadeLogs={logs.filter(l => l.isHomemade || l.cafe === "homemade")} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}
         {screen === "labels" && <LabelsScreen onNext={handleLabels} onBack={() => setScreen(isNewCafe ? "vibes" : "drink")} />}
         {screen === "ranking" && (

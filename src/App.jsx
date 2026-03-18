@@ -1028,7 +1028,123 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
       {showAvatar && <AvatarEditor avatar={avatar} setAvatar={setAvatar} theme={theme} setTheme={setTheme} username={username} onClose={() => setShowAvatar(false)} />}
       <div style={{ padding: "0 28px 0", display: tab === "cafe" ? "block" : "none" }}>
         <Logo />
-        {/* Monthly drinks chart */}
+        <div style={{ marginBottom: 20, position: "relative", lineHeight: 1.2 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+            <div className="tight-stack" style={{ color: C.text, fontSize: 36, fontWeight: "bold", textAlign: "center" }}>
+              {username}'s cafe
+            </div>
+            <button
+            onClick={onLogAnother}
+            style={{
+              position: "absolute",
+              right: 0,
+              background: C.card,
+              border: "none",
+              borderRadius: "50%",
+              width: 36,
+              height: 36,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: C.text,
+              fontSize: 22,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            +
+          </button>
+          </div>
+          <div className="tight-stack" style={{ color: C.textMuted, fontSize: 11, textAlign: "center", letterSpacing: "0.06em", marginTop: 3 }}>joined {joinedLabel}</div>
+        </div>
+
+        {/* Cafe search */}
+        <div style={{ marginBottom: 16, position: "relative" }}>
+          <input
+            placeholder="search any cafe..."
+            value={cafeSearch}
+            onChange={e => { setCafeSearch(e.target.value); setCafeSearchResult(null); setCafeSearchOpen(e.target.value.trim().length > 0); }}
+            onFocus={() => cafeSearch.trim().length > 0 && setCafeSearchOpen(true)}
+            style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
+          />
+          {cafeSearchOpen && (() => {
+            const allCafeNames = communityStats ? Object.keys(communityStats.cafeVisits) : [...new Set(logs.map(l => l.cafe))];
+            const matches = allCafeNames.filter(c => c.toLowerCase().includes(cafeSearch.toLowerCase())).slice(0, 6);
+            if (matches.length === 0) return null;
+            return (
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: C.cardLight, borderRadius: 16, overflow: "hidden", zIndex: 20, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                {matches.map(cafeName => (
+                  <div key={cafeName} onClick={async () => {
+                    setCafeSearchOpen(false);
+                    setCafeSearch(cafeName);
+                    try {
+                      const cafeLogs = await sb.get("logs", `cafe=eq.${encodeURIComponent(cafeName)}&select=amenities,study_rating,drink_rating,avg_price,drinks,username`);
+                      if (!cafeLogs || cafeLogs.error) return;
+                      const hasOutlets = cafeLogs.some(l => (l.amenities||[]).includes("outlets"));
+                      const hasWifi = cafeLogs.some(l => (l.amenities||[]).includes("wifi"));
+                      const hasBathroom = cafeLogs.some(l => (l.amenities||[]).includes("bathroom"));
+                      const studyRatings = cafeLogs.map(l => l.study_rating).filter(Boolean);
+                      const drinkRatings = cafeLogs.map(l => l.drink_rating).filter(Boolean);
+                      const prices = cafeLogs.map(l => l.avg_price).filter(Boolean);
+                      const avgStudy = studyRatings.length > 0 ? studyRatings.reduce((a,b)=>a+b,0)/studyRatings.length : null;
+                      const avgDrink = drinkRatings.length > 0 ? drinkRatings.reduce((a,b)=>a+b,0)/drinkRatings.length : null;
+                      const avgPrice = prices.length > 0 ? prices.reduce((a,b)=>a+b,0)/prices.length : null;
+                      const visitors = [...new Set(cafeLogs.map(l => l.username).filter(Boolean))].length;
+                      setCafeSearchResult({ name: cafeName, hasOutlets, hasWifi, hasBathroom, avgStudy, avgDrink, avgPrice, visitors, totalLogs: cafeLogs.length });
+                    } catch(e) {}
+                  }} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em" }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    {cafeName}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        {cafeSearchResult && (
+          <div style={{ background: C.card, borderRadius: 20, padding: "18px 20px", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ color: C.text, fontSize: 15, fontWeight: "600" }}>{cafeSearchResult.name}</div>
+              <button onClick={() => { setCafeSearchResult(null); setCafeSearch(""); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+              {[["outlets", cafeSearchResult.hasOutlets], ["wifi", cafeSearchResult.hasWifi], ["bathroom", cafeSearchResult.hasBathroom]].map(([label, has]) => (
+                <span key={label} style={{ background: has ? `${C.text}20` : "transparent", border: `2px solid ${has ? C.text : C.border}`, borderRadius: 50, padding: "5px 14px", color: has ? C.text : C.textMuted, fontSize: 12, letterSpacing: "0.03em" }}>
+                  {has ? "✓" : "✗"} {label}
+                </span>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div style={{ background: C.cardLight, borderRadius: 14, padding: "12px 8px", textAlign: "center" }}>
+                <div style={{ color: C.text, fontSize: 18, fontWeight: "700" }}>{cafeSearchResult.avgDrink ? cafeSearchResult.avgDrink.toFixed(1) + "★" : "—"}</div>
+                <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.04em", marginTop: 3 }}>drink</div>
+              </div>
+              <div style={{ background: C.cardLight, borderRadius: 14, padding: "12px 8px", textAlign: "center" }}>
+                <div style={{ color: C.text, fontSize: 18, fontWeight: "700" }}>{cafeSearchResult.avgStudy ? cafeSearchResult.avgStudy.toFixed(1) + "★" : "—"}</div>
+                <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.04em", marginTop: 3 }}>study</div>
+              </div>
+              <div style={{ background: C.cardLight, borderRadius: 14, padding: "12px 8px", textAlign: "center" }}>
+                <div style={{ color: C.text, fontSize: 18, fontWeight: "700" }}>{cafeSearchResult.avgPrice ? "$" + cafeSearchResult.avgPrice.toFixed(2) : "—"}</div>
+                <div style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.04em", marginTop: 3 }}>avg price</div>
+              </div>
+            </div>
+            <div style={{ color: C.textMuted, fontSize: 11, textAlign: "center", letterSpacing: "0.04em" }}>
+              {cafeSearchResult.visitors} {cafeSearchResult.visitors === 1 ? "visitor" : "visitors"} · {cafeSearchResult.totalLogs} {cafeSearchResult.totalLogs === 1 ? "log" : "logs"} on com
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <StatCard label="drinks chugged" value={totalChugs} large />
+          <StatCard label="cafes" value={uniqueCafes.length} large />
+          <StatCard label="caffeine this month" value={caffeineThisMonth > 0 ? caffeineThisMonth + "mg" : "—"} large smallNumber />
+          <StatCard label="spent this month" value={spentThisMonth > 0 ? "$" + spentThisMonth.toFixed(2) : "—"} large smallNumber />
+        </div>
+
+
         <div style={{ padding: "24px 0 12px", marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", height: 60, gap: 4 }}>
             {visibleMonths.map((m, i) => {

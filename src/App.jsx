@@ -405,23 +405,29 @@ function SignInScreen({ onLogin }) {
   );
 }
 
-function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] }) {
+function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [], onAddCafe }) {
   const C = useC();
-  const [cafe, setCafe] = useState("");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [addingNew, setAddingNew] = useState(false);
   const todayISO = new Date().toISOString().slice(0, 10);
   const [dateISO, setDateISO] = useState(todayISO);
 
-  const formatDisplay = (iso) => {
-    const [y, m, d] = iso.split("-");
-    return `${m}.${d}.${y.slice(2)}`;
-  };
-
-  const suggestions = cafe.trim().length > 0
-    ? pastCafes.filter(c => c.toLowerCase().includes(cafe.toLowerCase()))
+  const suggestions = query.trim().length > 0
+    ? sharedCafes.filter(c => c.toLowerCase().includes(query.toLowerCase()))
     : [];
 
-  const selectCafe = (name) => { setCafe(name); setShowSuggestions(false); };
+  const noMatch = query.trim().length > 1 && suggestions.length === 0;
+
+  const selectCafe = (name) => { const n = name.toLowerCase(); setSelected(n); setQuery(n); setShowSuggestions(false); setAddingNew(false); };
+
+  const handleAddNew = async () => {
+    const name = query.trim().toLowerCase();
+    if (!name) return;
+    if (onAddCafe) await onAddCafe(name);
+    selectCafe(name);
+  };
 
   return (
     <div style={{ ...styles.screen, background: C.bg }}>
@@ -431,12 +437,12 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] })
         <div style={{ paddingLeft: 24, paddingRight: 24, width: "100%", position: "relative" }}>
           <input
             placeholder=""
-            value={cafe}
-            onChange={(e) => { setCafe(e.target.value); setShowSuggestions(true); }}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSelected(""); setShowSuggestions(true); setAddingNew(false); }}
             onFocus={() => setShowSuggestions(true)}
-            style={{ background: C.card, border: "none", borderRadius: 50, padding: "14px 22px", color: C.text, fontSize: 15, width: "100%", outline: "none", boxSizing: "border-box", letterSpacing: "0.04em", textAlign: "center" }}
+            style={{ background: C.card, border: selected ? `2px solid ${C.text}` : "none", borderRadius: 50, padding: "14px 22px", color: C.text, fontSize: 15, width: "100%", outline: "none", boxSizing: "border-box", letterSpacing: "0.04em", textAlign: "center" }}
           />
-          {showSuggestions && suggestions.length > 0 && (
+          {showSuggestions && (suggestions.length > 0 || noMatch) && (
             <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 24, right: 24, background: C.cardLight, borderRadius: 16, overflow: "hidden", zIndex: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
               {suggestions.map((s) => (
                 <div key={s} onClick={() => selectCafe(s)} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em" }}
@@ -445,6 +451,13 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] })
                   {s}
                 </div>
               ))}
+              {noMatch && (
+                <div onClick={handleAddNew} style={{ padding: "12px 18px", color: C.textMuted, fontSize: 14, cursor: "pointer", textAlign: "center", letterSpacing: "0.03em" }}
+                  onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  + add "{query.trim()}" to com
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -465,7 +478,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, pastCafes = [] })
         </div>
       </div>
       <div style={{ paddingBottom: 40 }}>
-        <NextBtn onClick={() => { setShowSuggestions(false); onNext(cafe || "unnamed cafe", dateISO); }} />
+        <NextBtn onClick={() => { setShowSuggestions(false); onNext(selected || query || "unnamed cafe", dateISO); }} />
         {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
       </div>
     </div>
@@ -2065,6 +2078,14 @@ export default function App() {
   const [joinedDate, setJoinedDate] = useState(new Date());
   const [fromProfile, setFromProfile] = useState(false);
   const [communityStats, setCommunityStats] = useState(null);
+  const [sharedCafes, setSharedCafes] = useState([]);
+
+  const loadSharedCafes = async () => {
+    try {
+      const rows = await sb.get("cafes", "select=name&order=name.asc");
+      if (rows && !rows.error) setSharedCafes(rows.map(r => r.name));
+    } catch(e) {}
+  };
 
   // Load community stats for percentile comparisons
   const loadCommunityStats = async () => {
@@ -2110,6 +2131,7 @@ export default function App() {
       }
     } catch(e) {}
     await loadCommunityStats();
+    await loadSharedCafes();
     setScreen("cafe-entry");
   };
 
@@ -2231,7 +2253,7 @@ export default function App() {
     <div style={{ ...styles.app, background: currentTheme.bg }}>
       <div style={{ ...styles.phone, background: currentTheme.bg }}>
         {screen === "signin" && <SignInScreen onLogin={handleLogin} />}
-        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} pastCafes={[...new Set(logs.filter(l => !l.isHomemade).map(l => l.cafe))]} />}
+        {screen === "cafe-entry" && <CafeEntryScreen onNext={handleCafeEntry} onBack={fromProfile ? () => { setFromProfile(false); setScreen("profile"); } : () => setScreen("signin")} onSkip={() => setScreen("profile")} onHomemade={() => setScreen("homemade")} sharedCafes={sharedCafes} onAddCafe={async (name) => { const n = name.toLowerCase(); setSharedCafes(prev => [...new Set([...prev, n])].sort()); try { await sb.post("cafes", { name: n }); } catch(e) {} }} />}
         {screen === "drink" && <DrinkScreen onNext={handleDrink} onBack={() => setScreen("cafe-entry")} />}
         {screen === "homemade" && <HomemadeDrinkScreen onNext={handleHomemadeDone} onBack={() => setScreen("cafe-entry")} allHomemadeLogs={logs.filter(l => l.isHomemade)} />}
         {screen === "vibes" && <CafeVibesScreen isNew={isNewCafe} onNext={handleVibes} onBack={() => setScreen("drink")} />}

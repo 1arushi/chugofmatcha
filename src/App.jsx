@@ -1396,14 +1396,14 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ color: C.text, fontSize: 26, fontWeight: "bold", lineHeight: 1 }}>{selectedCafe}</div>
+                  <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => l.cafe === selectedCafe && l.notes).map(l => l.notes).join(", "), labels: [...d.allLabels] }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
+                </div>
                 {d.locations.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
                     <svg width="9" height="11" viewBox="0 0 13 16" fill="none"><path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor"/></svg>
                     <span style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.04em" }}>{d.locations.join(", ")}</span>
                   </div>
                 )}
-                  <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => l.cafe === selectedCafe && l.notes).map(l => l.notes).join(", "), labels: [...d.allLabels] }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
-                </div>
                 <div style={{ color: C.textMuted, fontSize: 12, marginTop: 3, letterSpacing: "0.04em" }}>visited {d.visits}x</div>
               </div>
 
@@ -1589,7 +1589,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
             {/* Filter panel */}
             {showFilters && (() => {
               // Build location options from all logs
-              const allLocations = [...new Set(logs.filter(l => l.location).map(l => l.location))];
+              const allLocations = [...new Set(cafeLogs2.filter(l => l.location).map(l => l.location))];
               const filterOptions = [
                 { id: "best-study", label: "best study" },
                 ...allLocations.map(loc => ({ id: `loc:${loc}`, label: `📍 ${loc}` })),

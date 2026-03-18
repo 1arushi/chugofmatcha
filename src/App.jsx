@@ -415,6 +415,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
   const [dateISO, setDateISO] = useState(todayISO);
   const [location, setLocation] = useState(defaultLocation);
   const [editingLocation, setEditingLocation] = useState(!defaultLocation);
+  React.useEffect(() => { setLocation(defaultLocation); setEditingLocation(!defaultLocation); }, [defaultLocation]);
 
   const suggestions = query.trim().length > 0
     ? sharedCafes.filter(c => {

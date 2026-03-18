@@ -405,7 +405,7 @@ function SignInScreen({ onLogin }) {
   );
 }
 
-function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [], onAddCafe }) {
+function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [], onAddCafe, defaultLocation = "", onSaveDefaultLocation }) {
   const C = useC();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("");
@@ -413,19 +413,37 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
   const [addingNew, setAddingNew] = useState(false);
   const todayISO = new Date().toISOString().slice(0, 10);
   const [dateISO, setDateISO] = useState(todayISO);
+  const [location, setLocation] = useState(defaultLocation);
+  const [editingLocation, setEditingLocation] = useState(!defaultLocation);
 
   const suggestions = query.trim().length > 0
-    ? sharedCafes.filter(c => c.toLowerCase().includes(query.toLowerCase()))
+    ? sharedCafes.filter(c => {
+        const namePart = c.includes(" · ") ? c.split(" · ")[0] : c;
+        return namePart.toLowerCase().includes(query.toLowerCase()) || c.toLowerCase().includes(query.toLowerCase());
+      })
     : [];
 
   const noMatch = query.trim().length > 1 && suggestions.length === 0;
 
-  const selectCafe = (name) => { const n = name.toLowerCase(); setSelected(n); setQuery(n); setShowSuggestions(false); setAddingNew(false); };
+  const selectCafe = (entry) => {
+    if (entry.includes(" · ")) {
+      const [cafeName, loc] = entry.split(" · ");
+      setSelected(cafeName.trim());
+      setQuery(cafeName.trim());
+      setLocation(loc.trim());
+    } else {
+      setSelected(entry.toLowerCase());
+      setQuery(entry.toLowerCase());
+    }
+    setShowSuggestions(false);
+    setAddingNew(false);
+  };
 
   const handleAddNew = async () => {
     const name = query.trim().toLowerCase();
     if (!name) return;
-    if (onAddCafe) await onAddCafe(name);
+    const entry = location ? `${name} · ${location.trim().toLowerCase()}` : name;
+    if (onAddCafe) await onAddCafe(entry);
     selectCafe(name);
   };
 
@@ -444,13 +462,24 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
           />
           {showSuggestions && (suggestions.length > 0 || noMatch) && (
             <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 24, right: 24, background: C.cardLight, borderRadius: 16, overflow: "hidden", zIndex: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
-              {suggestions.map((s) => (
-                <div key={s} onClick={() => selectCafe(s)} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em" }}
-                  onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  {s}
-                </div>
-              ))}
+              {suggestions.map((s) => {
+                const hasloc = s.includes(" · ");
+                const cafePart = hasloc ? s.split(" · ")[0] : s;
+                const locPart = hasloc ? s.split(" · ")[1] : null;
+                return (
+                  <div key={s} onClick={() => selectCafe(s)} style={{ padding: "12px 18px", color: C.text, fontSize: 14, cursor: "pointer", borderBottom: `1px solid ${C.border}`, textAlign: "center", letterSpacing: "0.03em", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <span>{cafePart}</span>
+                    {locPart && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, color: C.textMuted, fontSize: 11 }}>
+                        <svg width="8" height="10" viewBox="0 0 13 16" fill="none"><path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor"/></svg>
+                        {locPart}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
               {noMatch && (
                 <div onClick={handleAddNew} style={{ padding: "12px 18px", color: C.textMuted, fontSize: 14, cursor: "pointer", textAlign: "center", letterSpacing: "0.03em" }}
                   onMouseEnter={e => e.currentTarget.style.background = `${C.text}15`}
@@ -462,11 +491,29 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
           )}
         </div>
 
-        {/* Location + date row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 12 }}>
-          <svg width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, opacity: 0.45 }}>
-            <path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor" style={{ color: "inherit" }}/>
-          </svg>
+        {/* Location row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10 }}>
+          <button onClick={() => setEditingLocation(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, color: C.textMuted, opacity: 0.7 }}>
+            <svg width="11" height="14" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor"/>
+            </svg>
+            {!editingLocation && <span style={{ fontSize: 13, letterSpacing: "0.04em" }}>{location || "set location"}</span>}
+          </button>
+          {editingLocation && (
+            <input
+              autoFocus
+              value={location}
+              onChange={e => setLocation(e.target.value.toLowerCase())}
+              onBlur={() => { setEditingLocation(false); if (location && onSaveDefaultLocation) onSaveDefaultLocation(location); }}
+              onKeyDown={e => { if (e.key === "Enter") { setEditingLocation(false); if (location && onSaveDefaultLocation) onSaveDefaultLocation(location); } }}
+              placeholder="your city"
+              style={{ background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 13, letterSpacing: "0.04em", textAlign: "center", outline: "none", padding: "2px 4px", width: "120px" }}
+            />
+          )}
+        </div>
+
+        {/* Date row */}
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
           <input
             type="date"
             value={dateISO}
@@ -481,7 +528,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
         </div>
       </div>
       <div style={{ paddingBottom: 40 }}>
-        <NextBtn onClick={() => { setShowSuggestions(false); onNext(selected || query || "unnamed cafe", dateISO); }} />
+        <NextBtn onClick={() => { setShowSuggestions(false); onNext(selected || query || "unnamed cafe", dateISO, location); }} />
         {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
       </div>
     </div>
@@ -1248,7 +1295,8 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           const hasBathroom = amenities.includes("bathroom");
           const allLabels = [...new Set(cafeLogs.flatMap(l => l.labels || []))];
           const allNotes = cafeLogs.map(l => l.notes).filter(n => n && n.trim().length > 0);
-          return { visits, bestStudy, bestDrink, avgP, totalSpentCafe, hasOutlets, hasWifi, hasBathroom, allLabels, allNotes };
+          const locations = [...new Set(cafeLogs.map(l => l.location).filter(Boolean))];
+          return { visits, bestStudy, bestDrink, avgP, totalSpentCafe, hasOutlets, hasWifi, hasBathroom, allLabels, allNotes, locations };
         };
 
         if (selectedHomemade) {
@@ -1347,6 +1395,12 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ color: C.text, fontSize: 26, fontWeight: "bold", lineHeight: 1 }}>{selectedCafe}</div>
+                {d.locations.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 }}>
+                    <svg width="9" height="11" viewBox="0 0 13 16" fill="none"><path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor"/></svg>
+                    <span style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.04em" }}>{d.locations.join(", ")}</span>
+                  </div>
+                )}
                   <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => l.cafe === selectedCafe && l.notes).map(l => l.notes).join(", "), labels: [...d.allLabels] }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
                 </div>
                 <div style={{ color: C.textMuted, fontSize: 12, marginTop: 3, letterSpacing: "0.04em" }}>visited {d.visits}x</div>
@@ -1533,8 +1587,11 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 
             {/* Filter panel */}
             {showFilters && (() => {
+              // Build location options from all logs
+              const allLocations = [...new Set(logs.filter(l => l.location).map(l => l.location))];
               const filterOptions = [
                 { id: "best-study", label: "best study" },
+                ...allLocations.map(loc => ({ id: `loc:${loc}`, label: `📍 ${loc}` })),
                 { id: "outlets", label: "outlets" },
                 { id: "wifi", label: "wifi" },
                 { id: "bathroom", label: "bathroom" },
@@ -2078,6 +2135,7 @@ export default function App() {
   const isNewCafeRef = React.useRef(false);
   const [isHomemade, setIsHomemade] = useState(false);
   const [rankedCafes, setRankedCafes] = useState([]);
+  const [defaultLocation, setDefaultLocation] = useState("");
   const [joinedDate, setJoinedDate] = useState(new Date());
   const [fromProfile, setFromProfile] = useState(false);
   const [communityStats, setCommunityStats] = useState(null);
@@ -2119,6 +2177,7 @@ export default function App() {
     try { localStorage.setItem("com_theme", t); } catch(e) {}
     setAvatar(userRow.avatar || { gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#7a9e7e" });
     if (userRow.joined_date) setJoinedDate(userRow.joined_date);
+    if (userRow.default_location) setDefaultLocation(userRow.default_location);
     // Load user's logs
     try {
       const userLogs = await sb.get("logs", `user_id=eq.${userRow.id}&select=*&order=created_at.asc`);
@@ -2130,6 +2189,7 @@ export default function App() {
           avgPrice: l.avg_price, labels: l.labels || [],
           ingredient: l.ingredient || null,
           isHomemade: l.is_homemade || false,
+          location: l.location || "",
         })));
       }
     } catch(e) {}
@@ -2138,7 +2198,7 @@ export default function App() {
     setScreen("cafe-entry");
   };
 
-  const handleCafeEntry = (cafe, dateISO) => {
+  const handleCafeEntry = (cafe, dateISO, location = "") => {
     const knownCafes = logs.map((l) => l.cafe);
     const newCafe = !knownCafes.includes(cafe);
     setIsNewCafe(newCafe);

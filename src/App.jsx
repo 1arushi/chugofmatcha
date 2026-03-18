@@ -462,8 +462,11 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
           )}
         </div>
 
-        {/* Editable date */}
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+        {/* Location + date row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 12 }}>
+          <svg width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, opacity: 0.45 }}>
+            <path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor" style={{ color: "inherit" }}/>
+          </svg>
           <input
             type="date"
             value={dateISO}

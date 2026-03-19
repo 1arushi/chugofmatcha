@@ -440,11 +440,9 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
     setAddingNew(false);
   };
 
-  const handleAddNew = async () => {
+  const handleAddNew = () => {
     const name = query.trim().toLowerCase();
     if (!name) return;
-    const entry = location ? `${name} · ${location.trim().toLowerCase()}` : name;
-    if (onAddCafe) await onAddCafe(entry);
     selectCafe(name);
   };
 
@@ -529,7 +527,13 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
         </div>
       </div>
       <div style={{ paddingBottom: 40 }}>
-        <NextBtn onClick={() => { setShowSuggestions(false); onNext(selected || query || "unnamed cafe", dateISO, location); }} />
+        <NextBtn onClick={async () => {
+          setShowSuggestions(false);
+          const cafeName = (selected || query || "unnamed cafe").toLowerCase();
+          const entry = location ? `${cafeName} · ${location.trim().toLowerCase()}` : cafeName;
+          if (!sharedCafes.includes(entry) && onAddCafe) await onAddCafe(entry);
+          onNext(cafeName, dateISO, location);
+        }} />
         {onSkip && <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={onSkip} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", fontFamily: "Inter, sans-serif" }}>skip to my cafe →</button></div>}
       </div>
     </div>

@@ -2189,7 +2189,7 @@ export default function App() {
           studyRating: l.study_rating, drinkRating: l.drink_rating,
           avgPrice: l.avg_price, labels: l.labels || [],
           ingredient: l.ingredient || null,
-          isHomemade: l.is_homemade || false,
+          isHomemade: l.is_homemade || !!l.ingredient || false,
           location: l.location || "",
         })));
       }

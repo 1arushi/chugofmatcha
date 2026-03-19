@@ -517,7 +517,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
             type="date"
             value={dateISO}
             onChange={(e) => setDateISO(e.target.value)}
-            style={{ background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 13, letterSpacing: "0.06em", textAlign: "center", outline: "none", cursor: "pointer", padding: "2px 4px", colorScheme: "dark" }}
+            style={{ background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 13, letterSpacing: "0.06em", textAlign: "center", outline: "none", cursor: "pointer", padding: "2px 4px", colorScheme: C.bg === "#f5f0e8" ? "light" : "dark" }}
           />
         </div>
 
@@ -1048,6 +1048,9 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
   const [cafeSearch, setCafeSearch] = useState("");
   const [cafeSearchResult, setCafeSearchResult] = useState(null);
   const [cafeSearchOpen, setCafeSearchOpen] = useState(false);
+  const [spendingGoal, setSpendingGoal] = useState(() => { try { return parseFloat(localStorage.getItem("com_spending_goal")) || 0; } catch(e) { return 0; } });
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
   const theme = appTheme; const setTheme = setAppTheme;
 
   const totalChugs = logs.reduce((sum, l) => sum + (l.chugs || 0), 0);
@@ -1205,30 +1208,80 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           </div>
         )}
 
+        {/* Top stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
           <StatCard label="drinks chugged" value={totalChugs} large />
           <StatCard label="cafes" value={uniqueCafes.length} large />
-          <StatCard label="caffeine this month" value={caffeineThisMonth > 0 ? caffeineThisMonth + "mg" : "—"} large smallNumber />
-          <StatCard label="spent this month" value={spentThisMonth > 0 ? "$" + spentThisMonth.toFixed(2) : "—"} large smallNumber />
         </div>
 
-
-        <div style={{ padding: "24px 0 12px", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", height: 60, gap: 4 }}>
-            {visibleMonths.map((m, i) => {
-              const h = monthlyDrinks[i] === 0 ? 4 : Math.max(8, (monthlyDrinks[i] / maxDrinks) * 60);
+        {/* Money tracker + caffeine side by side */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
+          {/* Spending donut */}
+          <div style={{ flex: 1, background: C.card, borderRadius: 20, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em" }}>money tracker</span>
+              <button onClick={() => { setEditingGoal(true); setGoalInput(spendingGoal > 0 ? String(spendingGoal) : ""); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}>✎</button>
+            </div>
+            {editingGoal ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, justifyContent: "center" }}>
+                <div style={{ color: C.textMuted, fontSize: 11, textAlign: "center", letterSpacing: "0.04em" }}>monthly goal ($)</div>
+                <input
+                  autoFocus
+                  type="number"
+                  value={goalInput}
+                  onChange={e => setGoalInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); } }}
+                  style={{ background: C.cardLight, border: "none", borderRadius: 50, padding: "8px 14px", color: C.text, fontSize: 14, textAlign: "center", outline: "none", width: "100%", boxSizing: "border-box" }}
+                />
+                <button onClick={() => { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "7px", color: C.textDark, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>set goal</button>
+              </div>
+            ) : (() => {
+              const spent = spentThisMonth;
+              const goal = spendingGoal;
+              const pct = goal > 0 ? Math.min(spent / goal, 1) : 0;
+              const over = goal > 0 && spent > goal;
+              const r = 28; const circ = 2 * Math.PI * r;
+              const dash = pct * circ;
+              const color = over ? "#e07070" : `${C.text}`;
               return (
-                <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <div style={{
-                    width: "100%", height: h,
-                    background: monthlyDrinks[i] === 0 ? `${C.text}15` : `${C.text}50`,
-                    borderRadius: 4,
-                    transition: "height 0.3s",
-                  }} />
-                  <div style={{ color: C.textMuted, fontSize: 9, letterSpacing: "0.04em" }}>{m}</div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, justifyContent: "center" }}>
+                  <div style={{ position: "relative", width: 80, height: 80 }}>
+                    <svg width="80" height="80" viewBox="0 0 80 80">
+                      <circle cx="40" cy="40" r={r} fill="none" stroke={`${C.text}15`} strokeWidth="8" />
+                      <circle cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="8"
+                        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+                        transform="rotate(-90 40 40)" style={{ transition: "stroke-dasharray 0.5s" }} />
+                    </svg>
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ color: over ? "#e07070" : C.text, fontSize: 11, fontWeight: "700", lineHeight: 1 }}>${spent.toFixed(0)}</div>
+                      {goal > 0 && <div style={{ color: C.textMuted, fontSize: 9, lineHeight: 1.2 }}>/ ${goal.toFixed(0)}</div>}
+                    </div>
+                  </div>
+                  {goal === 0 && <div onClick={() => { setEditingGoal(true); setGoalInput(""); }} style={{ color: C.textMuted, fontSize: 10, marginTop: 6, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline" }}>set a goal</div>}
+                  {goal > 0 && <div style={{ color: C.textMuted, fontSize: 10, marginTop: 4, letterSpacing: "0.03em" }}>{over ? `$${(spent-goal).toFixed(0)} over` : `$${(goal-spent).toFixed(0)} left`}</div>}
                 </div>
               );
-            })}
+            })()}
+          </div>
+
+          {/* Caffeine visual */}
+          <div style={{ flex: 1, background: C.card, borderRadius: 20, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
+            <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 8, display: "block" }}>caffeine this month</span>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <div style={{ color: C.text, fontSize: 26, fontWeight: "700", lineHeight: 1 }}>{caffeineThisMonth > 0 ? caffeineThisMonth : "—"}</div>
+              {caffeineThisMonth > 0 && <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>mg</div>}
+              {caffeineThisMonth > 0 && (() => {
+                const cups = Math.round(caffeineThisMonth / 80);
+                return (
+                  <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 3, marginTop: 4, maxWidth: 80 }}>
+                    {Array.from({ length: Math.min(cups, 12) }).map((_, i) => (
+                      <span key={i} style={{ fontSize: 14 }}>🍵</span>
+                    ))}
+                    {cups > 12 && <span style={{ color: C.textMuted, fontSize: 10 }}>+{cups - 12}</span>}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
 

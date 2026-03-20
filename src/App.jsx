@@ -1261,7 +1261,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
                 </div>
 
                 {/* Right side values */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
                   <div style={{ color: over ? "#e07070" : C.text, fontSize: 26, fontWeight: "700", lineHeight: 1 }}>${spent.toFixed(2)}</div>
                   {goal > 0 && <div style={{ color: C.textMuted, fontSize: 13 }}>/ ${goal.toFixed(0)} goal</div>}
                   {goal > 0 && <div style={{ color: over ? "#e07070" : C.textMuted, fontSize: 11, letterSpacing: "0.03em" }}>{over ? `$${(spent-goal).toFixed(2)} over` : `$${(goal-spent).toFixed(2)} left`}</div>}

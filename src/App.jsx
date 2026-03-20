@@ -917,7 +917,11 @@ function BaristaAvatar({ avatar, size = 80 }) {
   }, [gender, hair, skin, outfit]);
 
   const aspectRatio = 1039 / 367;
-  return <canvas ref={canvasRef} style={{ width: size, height: size * aspectRatio, display: "block" }} />;
+  return (
+    <div style={{ width: size, height: size * aspectRatio, background: "white", borderRadius: 8, overflow: "hidden", display: "inline-block" }}>
+      <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+    </div>
+  );
 }
 
 function AvatarEditor({ avatar, setAvatar, theme, setTheme, username, onClose }) {

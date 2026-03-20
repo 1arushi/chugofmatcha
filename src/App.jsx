@@ -1214,75 +1214,62 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           <StatCard label="cafes" value={uniqueCafes.length} large />
         </div>
 
-        {/* Money tracker + caffeine side by side */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
-          {/* Spending donut */}
-          <div style={{ flex: 1, background: C.card, borderRadius: 20, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em" }}>money tracker</span>
-              <button onClick={() => { setEditingGoal(true); setGoalInput(spendingGoal > 0 ? String(spendingGoal) : ""); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}>✎</button>
-            </div>
-            {editingGoal ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, justifyContent: "center" }}>
-                <div style={{ color: C.textMuted, fontSize: 11, textAlign: "center", letterSpacing: "0.04em" }}>monthly goal ($)</div>
-                <input
-                  autoFocus
-                  type="number"
-                  value={goalInput}
-                  onChange={e => setGoalInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); } }}
-                  style={{ background: C.cardLight, border: "none", borderRadius: 50, padding: "8px 14px", color: C.text, fontSize: 14, textAlign: "center", outline: "none", width: "100%", boxSizing: "border-box" }}
-                />
-                <button onClick={() => { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "7px", color: C.textDark, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>set goal</button>
-              </div>
-            ) : (() => {
-              const spent = spentThisMonth;
-              const goal = spendingGoal;
-              const pct = goal > 0 ? Math.min(spent / goal, 1) : 0;
-              const over = goal > 0 && spent > goal;
-              const r = 28; const circ = 2 * Math.PI * r;
-              const dash = pct * circ;
-              const color = over ? "#e07070" : `${C.text}`;
-              return (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, justifyContent: "center" }}>
-                  <div style={{ position: "relative", width: 80, height: 80 }}>
-                    <svg width="80" height="80" viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r={r} fill="none" stroke={`${C.text}15`} strokeWidth="8" />
-                      <circle cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="8"
-                        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-                        transform="rotate(-90 40 40)" style={{ transition: "stroke-dasharray 0.5s" }} />
-                    </svg>
-                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ color: over ? "#e07070" : C.text, fontSize: 11, fontWeight: "700", lineHeight: 1 }}>${spent.toFixed(0)}</div>
-                      {goal > 0 && <div style={{ color: C.textMuted, fontSize: 9, lineHeight: 1.2 }}>/ ${goal.toFixed(0)}</div>}
-                    </div>
-                  </div>
-                  {goal === 0 && <div onClick={() => { setEditingGoal(true); setGoalInput(""); }} style={{ color: C.textMuted, fontSize: 10, marginTop: 6, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline" }}>set a goal</div>}
-                  {goal > 0 && <div style={{ color: C.textMuted, fontSize: 10, marginTop: 4, letterSpacing: "0.03em" }}>{over ? `$${(spent-goal).toFixed(0)} over` : `$${(goal-spent).toFixed(0)} left`}</div>}
-                </div>
-              );
-            })()}
+        {/* Money tracker */}
+        <div style={{ background: C.card, borderRadius: 20, padding: "14px 16px", marginBottom: 12 }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginBottom: 12 }}>
+            <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em" }}>money spent this month</span>
+            <button onClick={() => { setEditingGoal(true); setGoalInput(spendingGoal > 0 ? String(spendingGoal) : ""); }} style={{ position: "absolute", right: 0, background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}>✎</button>
           </div>
 
-          {/* Caffeine visual */}
-          <div style={{ flex: 1, background: C.card, borderRadius: 20, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
-            <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 8, display: "block" }}>caffeine this month</span>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              <div style={{ color: C.text, fontSize: 26, fontWeight: "700", lineHeight: 1 }}>{caffeineThisMonth > 0 ? caffeineThisMonth : "—"}</div>
-              {caffeineThisMonth > 0 && <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>mg</div>}
-              {caffeineThisMonth > 0 && (() => {
-                const cups = Math.round(caffeineThisMonth / 80);
-                return (
-                  <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 3, marginTop: 4, maxWidth: 80 }}>
-                    {Array.from({ length: Math.min(cups, 12) }).map((_, i) => (
-                      <span key={i} style={{ fontSize: 14 }}>🍵</span>
-                    ))}
-                    {cups > 12 && <span style={{ color: C.textMuted, fontSize: 10 }}>+{cups - 12}</span>}
-                  </div>
-                );
-              })()}
+          {editingGoal ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", padding: "4px 0" }}>
+              <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>monthly goal ($)</div>
+              <input
+                autoFocus
+                type="number"
+                value={goalInput}
+                onChange={e => setGoalInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); } }}
+                style={{ background: C.cardLight, border: "none", borderRadius: 50, padding: "8px 14px", color: C.text, fontSize: 14, textAlign: "center", outline: "none", width: "140px", boxSizing: "border-box" }}
+              />
+              <button onClick={() => { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "7px 20px", color: C.textDark, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>set goal</button>
             </div>
-          </div>
+          ) : (() => {
+            const spent = spentThisMonth;
+            const goal = spendingGoal;
+            const pct = goal > 0 ? Math.min(spent / goal, 1) : 0;
+            const over = goal > 0 && spent > goal;
+            const r = 30; const circ = 2 * Math.PI * r;
+            const dash = pct * circ;
+            const color = over ? "#e07070" : C.text;
+            return (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                {/* Donut */}
+                <div style={{ position: "relative", width: 84, height: 84, flexShrink: 0 }}>
+                  <svg width="84" height="84" viewBox="0 0 84 84">
+                    <circle cx="42" cy="42" r={r} fill="none" stroke={`${C.text}15`} strokeWidth="9" />
+                    <circle cx="42" cy="42" r={r} fill="none" stroke={color} strokeWidth="9"
+                      strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+                      transform="rotate(-90 42 42)" style={{ transition: "stroke-dasharray 0.5s" }} />
+                  </svg>
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ color: over ? "#e07070" : C.text, fontSize: 10, fontWeight: "700", textAlign: "center", lineHeight: 1.3 }}>
+                      {goal > 0 ? `${Math.round(pct * 100)}%` : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right side values */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ color: over ? "#e07070" : C.text, fontSize: 26, fontWeight: "700", lineHeight: 1 }}>${spent.toFixed(2)}</div>
+                  {goal > 0 && <div style={{ color: C.textMuted, fontSize: 13 }}>/ ${goal.toFixed(0)} goal</div>}
+                  {goal > 0 && <div style={{ color: over ? "#e07070" : C.textMuted, fontSize: 11, letterSpacing: "0.03em" }}>{over ? `$${(spent-goal).toFixed(2)} over` : `$${(goal-spent).toFixed(2)} left`}</div>}
+                  {goal === 0 && <div onClick={() => { setEditingGoal(true); setGoalInput(""); }} style={{ color: C.textMuted, fontSize: 11, cursor: "pointer", textDecoration: "underline", letterSpacing: "0.04em" }}>set a goal</div>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Best chugs */}

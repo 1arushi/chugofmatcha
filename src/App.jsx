@@ -857,7 +857,7 @@ function BaristaAvatar({ avatar, size = 80 }) {
     const si = idx(startX, startY);
     const targetR = data[si], targetG = data[si+1], targetB = data[si+2];
     // Don't fill if already dark (outline) or already filled
-    if (targetR < 100) return;
+    if (targetR < 200) return;
     if (targetR === fillR && targetG === fillG && targetB === fillB) return;
 
     const stack = [[startX, startY]];
@@ -872,7 +872,7 @@ function BaristaAvatar({ avatar, size = 80 }) {
       const i = idx(x, y);
       const r = data[i], g = data[i+1], b = data[i+2];
       // Only fill light pixels (white/near-white regions)
-      if (r < 100) continue;
+      if (r < 200) continue;
       data[i] = fillR; data[i+1] = fillG; data[i+2] = fillB;
       stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
     }
@@ -886,6 +886,8 @@ function BaristaAvatar({ avatar, size = 80 }) {
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;

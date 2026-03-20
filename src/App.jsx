@@ -837,110 +837,127 @@ function CafeListBox({ title, preview, fullList, renderRow, empty, footer, onNav
 function BaristaAvatar({ avatar, size = 80 }) {
   const { gender, skin, hair, outfit } = avatar;
   const s = size;
+  // outfit = apron color, white shirt underneath
+  const shoeColor = "#5a3a1a";
+  const pantColor = "#4a4a5a";
+  const shirtColor = "white";
+  const apronStrap = outfit;
+
   return (
-    <svg width={s} height={s} viewBox="0 0 80 110">
-      {/* === FEMALE === */}
+    <svg width={s} height={s} viewBox="0 0 80 115" style={{ overflow: "visible" }}>
+
+      {/* ── SHARED BODY (all genders) ── */}
+      {/* Legs */}
+      <rect x="31" y="84" width="8" height="18" rx="4" fill={pantColor} />
+      <rect x="41" y="84" width="8" height="18" rx="4" fill={pantColor} />
+      {/* Shoes */}
+      <ellipse cx="35" cy="103" rx="7" ry="4" fill={shoeColor} />
+      <ellipse cx="45" cy="103" rx="7" ry="4" fill={shoeColor} />
+      <ellipse cx="35" cy="102" rx="5" ry="2.5" fill="#7a5a3a" />
+      <ellipse cx="45" cy="102" rx="5" ry="2.5" fill="#7a5a3a" />
+
+      {/* White t-shirt body */}
+      <path d="M28 58 Q40 54 52 58 L52 86 L28 86 Z" fill={shirtColor} />
+      {/* T-shirt sleeves */}
+      <path d="M28 58 Q22 60 20 68 L26 70 Q27 64 30 61 Z" fill={shirtColor} />
+      <path d="M52 58 Q58 60 60 68 L54 70 Q53 64 50 61 Z" fill={shirtColor} />
+      {/* Forearms / hands */}
+      <path d="M20 68 Q18 76 19 80" stroke={skin} strokeWidth="6" fill="none" strokeLinecap="round" />
+      <path d="M60 68 Q62 76 61 80" stroke={skin} strokeWidth="6" fill="none" strokeLinecap="round" />
+      <ellipse cx="19" cy="82" rx="4" ry="3.5" fill={skin} />
+      <ellipse cx="61" cy="82" rx="4" ry="3.5" fill={skin} />
+
+      {/* ── APRON ── */}
+      {/* Left strap */}
+      <path d="M33 56 Q31 52 34 48 Q37 45 38 54" fill={apronStrap} />
+      {/* Right strap */}
+      <path d="M47 56 Q49 52 46 48 Q43 45 42 54" fill={apronStrap} />
+      {/* Apron bib */}
+      <rect x="33" y="54" width="14" height="16" rx="2" fill={apronStrap} />
+      {/* Bib pocket */}
+      <rect x="36" y="57" width="8" height="5" rx="1.5" fill={outfit} stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+      {/* Pocket accent line */}
+      <line x1="40" y1="57" x2="40" y2="62" stroke="rgba(255,255,255,0.2)" strokeWidth="0.6" />
+      {/* Apron skirt */}
+      <path d="M26 70 Q27 86 28 88 L52 88 Q53 86 54 70 Z" fill={apronStrap} />
+      {/* Apron waist band */}
+      <rect x="25" y="68" width="30" height="4" rx="2" fill={apronStrap} />
+      {/* Waist bow */}
+      <path d="M36 70 Q38 67 40 70 Q42 67 44 70" fill="none" stroke={outfit} strokeWidth="1.5" strokeLinecap="round" />
+      <ellipse cx="40" cy="70" rx="2" ry="1.5" fill={outfit} />
+      {/* Apron pockets bottom */}
+      <rect x="28" y="76" width="10" height="8" rx="2" fill={outfit} opacity="0.6" />
+      <rect x="42" y="76" width="10" height="8" rx="2" fill={outfit} opacity="0.6" />
+
+      {/* ── NECK ── */}
+      <rect x="37" y="48" width="6" height="9" rx="3" fill={skin} />
+
+      {/* ── HEAD ── */}
+      <ellipse cx="40" cy="34" rx="15" ry="16" fill={skin} />
+
+      {/* ── HAIR by gender ── */}
       {gender === "female" && <>
-        {/* Legs */}
-        <rect x="33" y="83" width="6" height="16" rx="3" fill={skin} />
-        <rect x="41" y="83" width="6" height="16" rx="3" fill={skin} />
-        {/* Shoes */}
-        <ellipse cx="36" cy="100" rx="6" ry="3.5" fill="#3a2a1a" />
-        <ellipse cx="44" cy="100" rx="6" ry="3.5" fill="#3a2a1a" />
-        {/* Skirt - flared short dress */}
-        <path d="M31 68 Q28 80 26 88 L54 88 Q52 80 49 68 Z" fill={outfit} />
-        {/* Bodice - fitted top */}
-        <path d="M33 55 Q40 52 47 55 L49 70 Q40 67 31 70 Z" fill={outfit} />
-        {/* Waist accent */}
-        <path d="M31 69 Q40 66 49 69" stroke="rgba(245,240,232,0.3)" strokeWidth="1.5" fill="none" />
-        {/* Apron */}
-        <path d="M35 57 Q40 55 45 57 L46 68 Q40 66 34 68 Z" fill="rgba(245,240,232,0.22)" />
-        {/* Arms */}
-        <path d="M33 57 Q23 65 24 75" stroke={outfit} strokeWidth="6" fill="none" strokeLinecap="round" />
-        <path d="M47 57 Q57 65 56 75" stroke={outfit} strokeWidth="6" fill="none" strokeLinecap="round" />
-        {/* Hands */}
-        <ellipse cx="24" cy="77" rx="3.5" ry="3" fill={skin} />
-        <ellipse cx="56" cy="77" rx="3.5" ry="3" fill={skin} />
-        {/* Neck */}
-        <rect x="37" y="46" width="6" height="9" rx="3" fill={skin} />
-        {/* Head */}
-        <ellipse cx="40" cy="35" rx="13" ry="14" fill={skin} />
-        {/* Medium wavy hair - between bob and short */}
-        <path d="M27 33 Q26 20 40 17 Q54 20 53 33 Q55 42 53 52 Q51 56 49 51 Q48 42 48 31 Q44 21 40 21 Q36 21 32 31 Q32 42 31 51 Q29 56 27 52 Q25 42 27 33 Z" fill={hair} />
-        <ellipse cx="40" cy="20" rx="13" ry="4.5" fill={hair} />
-        <path d="M34 20 Q40 18 46 20" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      </>}
-
-      {/* === NEUTRAL === */}
-      {gender === "neutral" && <>
-        {/* Wide-leg pants */}
-        <path d="M30 75 Q28 90 26 99 L36 99 Q37 83 40 77 Q43 83 44 99 L54 99 Q52 90 50 75 Z" fill={outfit} />
-        {/* Shoes */}
-        <ellipse cx="31" cy="100" rx="7" ry="3.5" fill="#3a2a1a" />
-        <ellipse cx="49" cy="100" rx="7" ry="3.5" fill="#3a2a1a" />
-        {/* Fitted top */}
-        <path d="M31 56 Q40 53 49 56 L50 77 L30 77 Z" fill={outfit} />
-        {/* Apron */}
-        <path d="M34 58 Q40 56 46 58 L47 74 L33 74 Z" fill="rgba(245,240,232,0.2)" />
-        {/* Arms */}
-        <path d="M31 58 Q21 66 22 76" stroke={outfit} strokeWidth="6" fill="none" strokeLinecap="round" />
-        <path d="M49 58 Q59 66 58 76" stroke={outfit} strokeWidth="6" fill="none" strokeLinecap="round" />
-        {/* Hands */}
-        <ellipse cx="22" cy="78" rx="3.5" ry="3" fill={skin} />
-        <ellipse cx="58" cy="78" rx="3.5" ry="3" fill={skin} />
-        {/* Neck */}
-        <rect x="37" y="47" width="6" height="9" rx="3" fill={skin} />
-        {/* Head */}
-        <ellipse cx="40" cy="35" rx="13" ry="14" fill={skin} />
-        {/* Hair - sits flush on head, bob shape */}
-        <path d="M27 33 Q26 22 40 20 Q54 22 53 33 Q54 40 53 47 Q51 51 49 47 Q48 39 48 31 Q44 23 40 23 Q36 23 32 31 Q32 39 31 47 Q29 51 27 47 Q26 40 27 33 Z" fill={hair} />
-        {/* Hair top - covers crown of head */}
-        <ellipse cx="40" cy="22" rx="13" ry="4" fill={hair} />
+        {/* Back hair */}
+        <path d="M25 32 Q24 48 26 58 Q28 62 30 58 Q29 48 29 32 Z" fill={hair} />
+        <path d="M55 32 Q56 48 54 58 Q52 62 50 58 Q51 48 51 32 Z" fill={hair} />
+        {/* Top/crown */}
+        <path d="M25 30 Q25 14 40 12 Q55 14 55 30 Q55 22 52 18 Q46 13 40 13 Q34 13 28 18 Q25 22 25 30 Z" fill={hair} />
+        <ellipse cx="40" cy="15" rx="14" ry="5" fill={hair} />
+        {/* Side pieces framing face */}
+        <path d="M25 30 Q23 38 25 46 Q27 50 29 46 Q28 38 28 30 Z" fill={hair} />
+        <path d="M55 30 Q57 38 55 46 Q53 50 51 46 Q52 38 52 30 Z" fill={hair} />
         {/* Hair shine */}
-        <path d="M34 22 Q40 20 46 22" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M33 16 Q40 13 47 16" stroke="rgba(255,255,255,0.22)" strokeWidth="2" fill="none" strokeLinecap="round" />
       </>}
 
-      {/* === MALE === */}
+      {gender === "neutral" && <>
+        {/* Short neat bowl cut */}
+        <path d="M25 30 Q25 14 40 12 Q55 14 55 30 Q55 22 52 18 Q46 13 40 13 Q34 13 28 18 Q25 22 25 30 Z" fill={hair} />
+        <ellipse cx="40" cy="15" rx="14" ry="5" fill={hair} />
+        {/* Slight side coverage */}
+        <path d="M25 30 Q24 36 26 40 Q27 43 29 40 Q28 35 28 30 Z" fill={hair} />
+        <path d="M55 30 Q56 36 54 40 Q53 43 51 40 Q52 35 52 30 Z" fill={hair} />
+        {/* Hair shine */}
+        <path d="M33 16 Q40 13 47 16" stroke="rgba(255,255,255,0.22)" strokeWidth="2" fill="none" strokeLinecap="round" />
+      </>}
+
       {gender === "male" && <>
-        {/* Legs */}
-        <rect x="30" y="80" width="8" height="18" rx="3" fill={outfit} />
-        <rect x="42" y="80" width="8" height="18" rx="3" fill={outfit} />
-        {/* Shoes */}
-        <ellipse cx="34" cy="100" rx="7" ry="3.5" fill="#3a2a1a" />
-        <ellipse cx="46" cy="100" rx="7" ry="3.5" fill="#3a2a1a" />
-        {/* Torso */}
-        <path d="M30 56 Q40 53 50 56 L46 82 L34 82 Z" fill={outfit} />
-        {/* Apron */}
-        <path d="M33 58 Q40 56 47 58 L44 79 L36 79 Z" fill="rgba(245,240,232,0.2)" />
-        {/* Arms */}
-        <path d="M30 58 Q21 66 22 76" stroke={outfit} strokeWidth="7" fill="none" strokeLinecap="round" />
-        <path d="M50 58 Q59 66 58 76" stroke={outfit} strokeWidth="7" fill="none" strokeLinecap="round" />
-        {/* Hands */}
-        <ellipse cx="22" cy="78" rx="4" ry="3.5" fill={skin} />
-        <ellipse cx="58" cy="78" rx="4" ry="3.5" fill={skin} />
-        {/* Neck */}
-        <rect x="37" y="47" width="6" height="9" rx="3" fill={skin} />
-        {/* Head */}
-        <ellipse cx="40" cy="36" rx="13" ry="14" fill={skin} />
-        {/* Male hair */}
-        <path d="M27 28 Q27 18 40 16 Q53 18 53 28 Q54 24 52 22 Q45 17 40 17 Q35 17 28 22 Q26 24 27 28 Z" fill={hair} />
-        <ellipse cx="40" cy="20" rx="13" ry="5" fill={hair} />
-        <ellipse cx="28" cy="27" rx="4" ry="5" fill={hair} />
-        <ellipse cx="52" cy="27" rx="4" ry="5" fill={hair} />
+        {/* Slightly longer, messier top */}
+        <path d="M25 30 Q25 14 40 12 Q55 14 55 30 Q55 22 52 18 Q46 13 40 13 Q34 13 28 18 Q25 22 25 30 Z" fill={hair} />
+        <ellipse cx="40" cy="15" rx="14" ry="5.5" fill={hair} />
+        {/* Messy top tufts */}
+        <path d="M36 13 Q38 9 40 13" fill={hair} />
+        <path d="M40 12 Q42 8 44 12" fill={hair} />
+        {/* Slight side bits */}
+        <path d="M25 30 Q24 34 26 37 Q28 39 29 36 Q28 33 28 30 Z" fill={hair} />
+        <path d="M55 30 Q56 34 54 37 Q52 39 51 36 Q52 33 52 30 Z" fill={hair} />
+        {/* Hair shine */}
+        <path d="M33 16 Q40 13 47 16" stroke="rgba(255,255,255,0.22)" strokeWidth="2" fill="none" strokeLinecap="round" />
       </>}
 
-      {/* Eyes */}
-      <ellipse cx="34" cy="35" rx="2.5" ry="2.5" fill="#3a2a1a" />
-      <ellipse cx="46" cy="35" rx="2.5" ry="2.5" fill="#3a2a1a" />
-      <circle cx="35" cy="34" r="0.8" fill="white" />
-      <circle cx="47" cy="34" r="0.8" fill="white" />
+      {/* ── FACE ── */}
+      {/* Big chibi eyes — white sclera */}
+      <ellipse cx="33" cy="34" rx="4.5" ry="5" fill="white" />
+      <ellipse cx="47" cy="34" rx="4.5" ry="5" fill="white" />
+      {/* Iris */}
+      <ellipse cx="33" cy="35" rx="3" ry="3.5" fill="#3a2010" />
+      <ellipse cx="47" cy="35" rx="3" ry="3.5" fill="#3a2010" />
+      {/* Pupil */}
+      <ellipse cx="33" cy="35.5" rx="1.8" ry="2" fill="#1a0a00" />
+      <ellipse cx="47" cy="35.5" rx="1.8" ry="2" fill="#1a0a00" />
+      {/* Eye shine */}
+      <circle cx="34.5" cy="33.5" r="1.2" fill="white" />
+      <circle cx="48.5" cy="33.5" r="1.2" fill="white" />
+      <circle cx="32" cy="37" r="0.6" fill="white" opacity="0.6" />
+      <circle cx="46" cy="37" r="0.6" fill="white" opacity="0.6" />
+      {/* Eyelash top */}
+      <path d="M28.5 30.5 Q33 28 37.5 30.5" stroke="#2a1008" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      <path d="M42.5 30.5 Q47 28 51.5 30.5" stroke="#2a1008" strokeWidth="1.2" fill="none" strokeLinecap="round" />
       {/* Smile */}
-      <path d="M35 42 Q40 46 45 42" stroke="#3a2a1a" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <path d="M36 42 Q40 46 44 42" stroke="#3a2010" strokeWidth="1.5" fill="none" strokeLinecap="round" />
       {/* Blush */}
-      <ellipse cx="29" cy="40" rx="4" ry="2.5" fill="rgba(255,150,130,0.25)" />
-      <ellipse cx="51" cy="40" rx="4" ry="2.5" fill="rgba(255,150,130,0.25)" />
-      {/* Collar */}
-      <path d="M34 54 L40 57 L46 54" stroke="rgba(245,240,232,0.4)" strokeWidth="1.5" fill="none" />
+      <ellipse cx="27" cy="39" rx="4.5" ry="2.5" fill="rgba(255,140,120,0.28)" />
+      <ellipse cx="53" cy="39" rx="4.5" ry="2.5" fill="rgba(255,140,120,0.28)" />
     </svg>
   );
 }

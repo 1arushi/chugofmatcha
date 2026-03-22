@@ -359,7 +359,7 @@ function SignInScreen({ onLogin }) {
         const joined = `${(now.getMonth()+1).toString().padStart(2,"0")}.${now.getDate().toString().padStart(2,"0")}.${now.getFullYear().toString().slice(2)}`;
         const rows = await sb.post("users", {
           username: username.trim(), password_hash: hash,
-          joined_date: joined, avatar: { gender:"female", skin:"#f5c5a3", hair:"#4a2c0a", outfit:"#7a9e7e" },
+          joined_date: joined, avatar: { gender:"female", skin:"#f5c5a3", hair:"#4a2c0a", outfit:"#8b6b4a", apron:"#6b4a2a", pockets:"#4a2c0a" },
           theme: "green", ranked_cafes: [],
           email: email.trim() || null
         });
@@ -835,7 +835,7 @@ function CafeListBox({ title, preview, fullList, renderRow, empty, footer, onNav
 
 
 function BaristaAvatar({ avatar, size = 80 }) {
-  const { gender, skin, hair, outfit } = avatar;
+  const { gender, skin, hair, outfit, apron, pockets } = avatar;
   const canvasRef = React.useRef(null);
 
   const LAYERS = {
@@ -898,16 +898,16 @@ function BaristaAvatar({ avatar, size = 80 }) {
 
     const skinRgb    = hexToRgb(skin);
     const hairRgb    = hexToRgb(hair);
-    const outfitRgb  = hexToRgb(outfit);
-    const shirtRgb   = lighten(outfitRgb, 0.35);
-    const detailsRgb = darken(outfitRgb, 0.2);
+    const shirtRgb   = hexToRgb(outfit);
+    const apronRgb   = hexToRgb(apron || outfit);
+    const detailsRgb = hexToRgb(pockets || outfit);
 
     const layerOrder = ["apron", "shirt", "details", "skin", "hair", "outline"];
     const colorMap = {
       outline: skinRgb,
       hair:    hairRgb,
       details: detailsRgb,
-      apron:   outfitRgb,
+      apron:   apronRgb,
       shirt:   shirtRgb,
       skin:    null,
     };
@@ -947,7 +947,7 @@ function BaristaAvatar({ avatar, size = 80 }) {
       };
       img.src = LAYERS[name];
     });
-  }, [skin, hair, outfit]);
+  }, [skin, hair, outfit, apron, pockets]);
 
   return (
     <canvas
@@ -1015,11 +1015,27 @@ function AvatarEditor({ avatar, setAvatar, theme, setTheme, username, onClose })
           </div>
         </div>
 
-        {/* Outfit color */}
+        {/* Shirt / pants color */}
         <div style={{ background: C.card, borderRadius: 18, padding: "14px 18px" }}>
-          <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12 }}>outfit color</div>
+          <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12 }}>shirt & pants</div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             {outfitColors.map(c => <Swatch key={c} color={c} selected={avatar.outfit === c} onSelect={() => setAvatar(a => ({...a, outfit: c}))} />)}
+          </div>
+        </div>
+
+        {/* Apron color */}
+        <div style={{ background: C.card, borderRadius: 18, padding: "14px 18px" }}>
+          <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12 }}>apron</div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            {outfitColors.map(c => <Swatch key={c} color={c} selected={(avatar.apron || avatar.outfit) === c} onSelect={() => setAvatar(a => ({...a, apron: c}))} />)}
+          </div>
+        </div>
+
+        {/* Pockets / details color */}
+        <div style={{ background: C.card, borderRadius: 18, padding: "14px 18px" }}>
+          <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12 }}>pockets & details</div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            {outfitColors.map(c => <Swatch key={c} color={c} selected={(avatar.pockets || avatar.outfit) === c} onSelect={() => setAvatar(a => ({...a, pockets: c}))} />)}
           </div>
         </div>
 
@@ -2183,7 +2199,7 @@ function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
 export default function App() {
   const [screen, setScreen] = useState("signin");
   const [appTheme, setAppTheme] = useState(() => { try { return localStorage.getItem("com_theme") || "green"; } catch(e) { return "green"; } });
-  const [avatar, setAvatar] = useState({ gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#7a9e7e" });
+  const [avatar, setAvatar] = useState({ gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#8b6b4a", apron: "#6b4a2a", pockets: "#4a2c0a" });
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState("");
   const [logs, setLogs] = useState([]);
@@ -2232,7 +2248,7 @@ export default function App() {
     const t = userRow.theme || "green";
     setAppTheme(t);
     try { localStorage.setItem("com_theme", t); } catch(e) {}
-    setAvatar(userRow.avatar || { gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#7a9e7e" });
+    setAvatar(userRow.avatar || { gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#8b6b4a", apron: "#6b4a2a", pockets: "#4a2c0a" });
     if (userRow.joined_date) setJoinedDate(userRow.joined_date);
     if (userRow.default_location) setDefaultLocation(userRow.default_location);
     // Load user's logs

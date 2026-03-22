@@ -880,6 +880,8 @@ function BaristaAvatar({ avatar, size = 80 }) {
     const [tr,tg,tb] = targetRgb;
     for (let i = 0; i < data.length; i += 4) {
       if (data[i+3] < 10) continue;
+      // Skip dark pixels (outlines) - don't recolor anything too dark
+      if (data[i] + data[i+1] + data[i+2] < 80) continue;
       const dr = Math.abs(data[i]-br);
       const dg = Math.abs(data[i+1]-bg);
       const db = Math.abs(data[i+2]-bb);

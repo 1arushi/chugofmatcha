@@ -35,8 +35,8 @@ const THEMES = {
   },
   white: {
     bg: "#f2ede4", card: "#e4ddd2", cardLight: "#d8d0c4",
-    text: "#3a3028", textMuted: "rgba(58,48,40,0.6)", textDark: "#f2ede4",
-    inputBg: "#e4ddd2", border: "rgba(58,48,40,0.18)", pill: "#e4ddd2", pillActive: "#3a3028",
+    text: "#3a2a1a", textMuted: "rgba(58,42,26,0.6)", textDark: "#f2ede4",
+    inputBg: "#e4ddd2", border: "rgba(58,42,26,0.18)", pill: "#e4ddd2", pillActive: "#3a2a1a",
   },
   black: {
     bg: "#1a1a1a", card: "#2a2a2a", cardLight: "#333333",
@@ -1316,7 +1316,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
         />
 
         {/* Avatar centered at bottom */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "absolute", bottom: 100, left: 0, right: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 12 }}>
           <div onClick={() => setShowAvatar(true)} style={{ cursor: "pointer", marginBottom: -8 }}>
             <BaristaAvatar avatar={avatar} size={70} />
           </div>
@@ -2256,7 +2256,7 @@ export default function App() {
     const t = userRow.theme || "green";
     setAppTheme(t);
     try { localStorage.setItem("com_theme", t); } catch(e) {}
-    setAvatar(userRow.avatar || { gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#8b6b4a", apron: "#6b4a2a", pockets: "#4a2c0a" });
+    setAvatar({ gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#8b6b4a", apron: "#6b4a2a", pockets: "#4a2c0a", ...userRow.avatar });
     if (userRow.joined_date) setJoinedDate(userRow.joined_date);
     if (userRow.default_location) setDefaultLocation(userRow.default_location);
     // Load user's logs

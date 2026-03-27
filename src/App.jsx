@@ -143,27 +143,31 @@ const styles = {
 function Logo({ onBack }) {
   const C = useC();
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "52px 0 16px" }}>
-      {onBack && (
-        <button
-          onClick={onBack}
-          style={{
-            position: "absolute",
-            left: 0,
-            background: "none",
-            border: "none",
-            color: C.textMuted,
-            fontSize: 22,
-            cursor: "pointer",
-            padding: "0",
-            fontFamily: "'Instrument Serif', serif",
-            lineHeight: 1,
-          }}
-        >
-          ‹
-        </button>
-      )}
-      <span className="logo-text" style={{ color: C.textMuted, fontSize: 16, letterSpacing: "0.08em" }}>chugofmatcha</span>
+    <div style={{ padding: "52px 28px 16px" }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "none",
+              border: "none",
+              color: C.textMuted,
+              fontSize: 22,
+              cursor: "pointer",
+              padding: "0",
+              fontFamily: "'Instrument Serif', serif",
+              lineHeight: 1,
+            }}
+          >
+            ‹
+          </button>
+        )}
+        <span className="logo-text" style={{ color: C.textMuted, fontSize: 16, letterSpacing: "0.08em" }}>chugofmatcha</span>
+      </div>
     </div>
   );
 }
@@ -339,11 +343,27 @@ function StatCard({ label, value, large, smallNumber }) {
 function SignInScreen({ onLogin }) {
   const C = useC();
   const [username, setUsername] = useState("");
+  const [baristaName, setBaristaName] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [resetFlow, setResetFlow] = useState(null); // null | "email" | "code" | "password"
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetCodeInput, setResetCodeInput] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [resetUserId, setResetUserId] = useState(null);
+
+  const exitReset = () => {
+    setResetFlow(null);
+    setResetEmail("");
+    setResetCodeInput("");
+    setNewPassword("");
+    setResetUserId(null);
+    setError("");
+  };
 
   const handleSubmit = async () => {
     if (!username.trim() || !password.trim()) { setError("enter a username and password"); return; }
@@ -361,7 +381,8 @@ function SignInScreen({ onLogin }) {
           username: username.trim(), password_hash: hash,
           joined_date: joined, avatar: { gender:"female", skin:"#f5c5a3", hair:"#4a2c0a", outfit:"#8b6b4a", apron:"#6b4a2a", pockets:"#4a2c0a" },
           theme: "green", ranked_cafes: [],
-          email: email.trim() || null
+          email: email.trim() || null,
+          barista_name: baristaName.trim() || username.trim(),
         });
         if (!rows || rows?.code || rows?.error || !Array.isArray(rows) || rows.length === 0) {
           setError("signup failed, try again");
@@ -378,6 +399,147 @@ function SignInScreen({ onLogin }) {
     setLoading(false);
   };
 
+  const handleSendResetEmail = async () => {
+    if (!resetEmail.trim()) { setError("enter your email"); return; }
+    setLoading(true); setError("");
+    try {
+      const rows = await sb.get("users", `email=eq.${encodeURIComponent(resetEmail.trim())}&select=id`);
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setError("no account with that email");
+        setLoading(false);
+        return;
+      }
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const patched = await sb.patch("users", `id=eq.${rows[0].id}`, { reset_code: String(code) });
+      if (patched && typeof patched === "object" && !Array.isArray(patched) && (patched.code || patched.error)) {
+        setError(patched.message || patched.hint || "could not save reset code");
+        setLoading(false);
+        return;
+      }
+      const res = await fetch("/api/send-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail.trim(), code }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err.error || "could not send email");
+        setLoading(false);
+        return;
+      }
+      setResetFlow("code");
+    } catch (e) {
+      setError("connection error, try again");
+    }
+    setLoading(false);
+  };
+
+  const handleVerifyResetCode = async () => {
+    if (!/^\d{6}$/.test(resetCodeInput.trim())) { setError("enter the 6-digit code"); return; }
+    setLoading(true); setError("");
+    try {
+      const rows = await sb.get("users", `email=eq.${encodeURIComponent(resetEmail.trim())}&select=id,reset_code`);
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setError("session expired — start over");
+        setLoading(false);
+        return;
+      }
+      if (String(rows[0].reset_code ?? "") !== resetCodeInput.trim()) {
+        setError("code doesn't match");
+        setLoading(false);
+        return;
+      }
+      setResetUserId(rows[0].id);
+      setResetFlow("password");
+    } catch (e) {
+      setError("connection error, try again");
+    }
+    setLoading(false);
+  };
+
+  const handleSetNewPassword = async () => {
+    if (!newPassword.trim()) { setError("enter a new password"); return; }
+    if (!resetUserId) { setError("session expired"); return; }
+    setLoading(true); setError("");
+    try {
+      const hash = hashPassword(newPassword);
+      const patched = await sb.patch("users", `id=eq.${resetUserId}`, { password_hash: hash, reset_code: null });
+      if (patched && typeof patched === "object" && !Array.isArray(patched) && (patched.code || patched.error)) {
+        setError(patched.message || "could not update password");
+        setLoading(false);
+        return;
+      }
+      exitReset();
+      setMode("signin");
+      setPassword("");
+      setUsername("");
+      setError("password updated — you can sign in");
+    } catch (e) {
+      setError("connection error, try again");
+    }
+    setLoading(false);
+  };
+
+  if (resetFlow === "email") {
+    return (
+      <div style={{ ...styles.screen, background: C.bg }}>
+        <Logo onBack={exitReset} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ color: C.text, fontSize: 18, marginBottom: 16, letterSpacing: "0.04em", textAlign: "center" }}>
+            reset password
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 8, paddingLeft: 24, paddingRight: 24 }}>
+            <Input placeholder="email" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} />
+          </div>
+          {error && <div style={{ color: C.text, fontSize: 13, textAlign: "center", marginBottom: 12, opacity: 0.8 }}>{error}</div>}
+          <div style={{ marginBottom: 20, marginTop: 16 }}>
+            <NextBtn label={loading ? "..." : "send code"} onClick={handleSendResetEmail} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (resetFlow === "code") {
+    return (
+      <div style={{ ...styles.screen, background: C.bg }}>
+        <Logo onBack={() => { setResetFlow("email"); setResetCodeInput(""); setError(""); }} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ color: C.text, fontSize: 18, marginBottom: 16, letterSpacing: "0.04em", textAlign: "center" }}>
+            enter code
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 8, paddingLeft: 24, paddingRight: 24 }}>
+            <Input placeholder="6-digit code" value={resetCodeInput} onChange={(e) => setResetCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+          </div>
+          {error && <div style={{ color: C.text, fontSize: 13, textAlign: "center", marginBottom: 12, opacity: 0.8 }}>{error}</div>}
+          <div style={{ marginBottom: 20, marginTop: 16 }}>
+            <NextBtn label={loading ? "..." : "continue"} onClick={handleVerifyResetCode} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (resetFlow === "password") {
+    return (
+      <div style={{ ...styles.screen, background: C.bg }}>
+        <Logo onBack={() => { setResetFlow("code"); setNewPassword(""); setError(""); }} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ color: C.text, fontSize: 18, marginBottom: 16, letterSpacing: "0.04em", textAlign: "center" }}>
+            new password
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 8, paddingLeft: 24, paddingRight: 24 }}>
+            <Input placeholder="new password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          </div>
+          {error && <div style={{ color: C.text, fontSize: 13, textAlign: "center", marginBottom: 12, opacity: 0.8 }}>{error}</div>}
+          <div style={{ marginBottom: 20, marginTop: 16 }}>
+            <NextBtn label={loading ? "..." : "save password"} onClick={handleSetNewPassword} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...styles.screen, background: C.bg }}>
       <Logo />
@@ -387,6 +549,7 @@ function SignInScreen({ onLogin }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 8, paddingLeft: 24, paddingRight: 24 }}>
           <Input placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          {mode === "signup" && <Input placeholder="barista name" value={baristaName} onChange={(e) => setBaristaName(e.target.value)} />}
           {mode === "signup" && <Input placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
           <Input placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
@@ -394,8 +557,19 @@ function SignInScreen({ onLogin }) {
         <div style={{ marginBottom: 20, marginTop: 16 }}>
           <NextBtn label={loading ? "..." : mode === "signin" ? "sign in" : "sign up"} onClick={handleSubmit} />
         </div>
+        {mode === "signin" && (
+          <div style={{ textAlign: "center", marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => { setError(""); setResetEmail(""); setResetFlow("email"); }}
+              style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline", opacity: 0.5 }}
+            >
+              forgot password?
+            </button>
+          </div>
+        )}
         <div style={{ textAlign: "center" }}>
-          <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setEmail(""); }}
+          <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setEmail(""); setBaristaName(""); }}
             style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", letterSpacing: "0.04em", textDecoration: "underline" }}>
             {mode === "signin" ? "no account? sign up" : "already have one? sign in"}
           </button>
@@ -963,7 +1137,306 @@ function BaristaAvatar({ avatar, size = 80 }) {
   );
 }
 
-function AvatarEditor({ avatar, setAvatar, theme, setTheme, username, onClose }) {
+const DEFAULT_AVATAR = { gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#8b6b4a", apron: "#6b4a2a", pockets: "#4a2c0a" };
+
+function mergeUserAvatar(row) {
+  if (!row?.avatar || typeof row.avatar !== "object") return { ...DEFAULT_AVATAR };
+  return { ...DEFAULT_AVATAR, ...row.avatar };
+}
+
+function FriendsScreen({ userId, friends, onClose, onViewFriend, onFriendsChanged }) {
+  const C = useC();
+  const [search, setSearch] = useState("");
+  const [searchHits, setSearchHits] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  const loadPending = React.useCallback(async () => {
+    if (!userId) return;
+    try {
+      const rows = await sb.get("friends", `receiver_id=eq.${userId}&status=eq.pending&select=id,requester_id`);
+      if (!rows || rows.error || !Array.isArray(rows) || rows.length === 0) {
+        setPending([]);
+        return;
+      }
+      const ids = [...new Set(rows.map(r => r.requester_id).filter(Boolean))];
+      const users = await sb.get("users", `id=in.(${ids.join(",")})&select=id,username,barista_name`);
+      const umap = {};
+      if (Array.isArray(users)) users.forEach(u => { umap[u.id] = u; });
+      setPending(rows.map(r => ({ ...r, requester: umap[r.requester_id] })));
+    } catch (e) {
+      setPending([]);
+    }
+  }, [userId]);
+
+  React.useEffect(() => { loadPending(); }, [loadPending]);
+
+  const runSearch = async () => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setSearchHits([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const pattern = `%${q}%`;
+      const rows = await sb.get("users", `username=ilike.${encodeURIComponent(pattern)}&select=id,username,barista_name&limit=20`);
+      const friendIds = new Set((friends || []).map(f => f.id));
+      if (!rows || rows.error || !Array.isArray(rows)) {
+        setSearchHits([]);
+      } else {
+        setSearchHits(rows.filter(u => u.id !== userId && !friendIds.has(u.id)));
+      }
+    } catch (e) {
+      setSearchHits([]);
+    }
+    setSearching(false);
+  };
+
+  const sendRequest = async (receiverId) => {
+    if (!userId || receiverId === userId) return;
+    setBusy(true);
+    try {
+      await sb.post("friends", { requester_id: userId, receiver_id: receiverId, status: "pending" });
+      setSearchHits(h => h.filter(u => u.id !== receiverId));
+    } catch (e) {}
+    setBusy(false);
+  };
+
+  const acceptRequest = async (row) => {
+    setBusy(true);
+    try {
+      const out = await sb.patch("friends", `id=eq.${row.id}`, { status: "accepted" });
+      if (out && typeof out === "object" && !Array.isArray(out) && (out.code || out.error)) {
+        return;
+      }
+      await loadPending();
+      onFriendsChanged?.();
+    } catch (e) {}
+    setBusy(false);
+  };
+
+  const declineRequest = async (row) => {
+    setBusy(true);
+    try {
+      await sb.delete("friends", `id=eq.${row.id}`);
+      await loadPending();
+    } catch (e) {}
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: C.bg, zIndex: 100, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 20 }}>
+        <Logo onBack={onClose} />
+        <div style={{ padding: "0 28px 50px" }}>
+          <div style={{ color: C.text, fontSize: 18, marginBottom: 16, letterSpacing: "0.04em", textAlign: "center" }}>
+            friends
+          </div>
+          <div style={{ maxWidth: 300, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 44px", gap: 10, alignItems: "center" }}>
+              <input
+                placeholder="search by username"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  background: C.card,
+                  borderRadius: 50,
+                  padding: "14px 22px",
+                  color: C.text,
+                  fontSize: 15,
+                  border: "none",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  letterSpacing: "0.04em",
+                  textAlign: "center",
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              />
+              <button
+                type="button"
+                onClick={runSearch}
+                disabled={searching}
+                aria-label="Search"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "50%",
+                  background: C.text,
+                  border: "none",
+                  cursor: searching ? "default" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                  opacity: searching ? 0.6 : 1,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.textDark }}>
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </button>
+            </div>
+          {searchHits.length > 0 && (
+            <div>
+              <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12, textAlign: "center" }}>results</div>
+              {searchHits.map(u => (
+                <div key={u.id} style={{ background: C.card, borderRadius: 18, padding: "14px 18px", marginBottom: 8, textAlign: "center" }}>
+                  <div style={{ color: C.text, fontSize: 14, marginBottom: 10 }}>{u.barista_name || u.username}</div>
+                  <button type="button" onClick={() => sendRequest(u.id)} disabled={busy} style={{ background: C.text, color: C.textDark, border: "none", borderRadius: 50, fontSize: 13, fontFamily: "'Inter', sans-serif", padding: "8px 20px", cursor: "pointer" }}>add</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {pending.length > 0 && (
+            <div>
+              <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12, textAlign: "center" }}>requests</div>
+              {pending.map(row => (
+                <div key={row.id} style={{ background: C.card, borderRadius: 18, padding: "14px 18px", marginBottom: 8, textAlign: "center" }}>
+                  <div style={{ color: C.text, fontSize: 14, marginBottom: 10 }}>{row.requester?.barista_name || row.requester?.username || "someone"}</div>
+                  <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+                    <button type="button" onClick={() => acceptRequest(row)} disabled={busy} style={{ background: C.text, color: C.textDark, border: "none", borderRadius: 50, fontSize: 13, fontFamily: "'Inter', sans-serif", padding: "8px 18px", cursor: "pointer" }}>accept</button>
+                    <button type="button" onClick={() => declineRequest(row)} disabled={busy} style={{ background: "transparent", color: C.textMuted, border: `2px solid ${C.border}`, borderRadius: 50, fontSize: 13, fontFamily: "'Inter', sans-serif", padding: "8px 18px", cursor: "pointer" }}>decline</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div>
+            <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12, textAlign: "left" }}>your friends</div>
+            {(friends || []).length === 0 ? (
+              <div style={{ color: C.textMuted, fontSize: 13, textAlign: "center" }}>no friends yet</div>
+            ) : (
+              (friends || []).map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => onViewFriend(f.id)}
+                  style={{ display: "block", width: "100%", textAlign: "center", background: C.card, border: "none", borderRadius: 18, padding: "14px 18px", marginBottom: 8, color: C.text, fontSize: 14, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}
+                >
+                  {f.barista_name || f.username}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FriendCafeScreen({ friendId, onBack, myAvatar, myBaristaName }) {
+  const [friendUser, setFriendUser] = useState(null);
+  const [friendLogs, setFriendLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const parentC = useC();
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const urows = await sb.get("users", `id=eq.${friendId}&select=id,username,barista_name,avatar,theme,ranked_cafes,joined_date`);
+        const lrows = await sb.get("logs", `user_id=eq.${friendId}&select=*&order=created_at.asc`);
+        if (cancelled) return;
+        const u = Array.isArray(urows) && urows[0] ? urows[0] : null;
+        setFriendUser(u);
+        if (lrows && Array.isArray(lrows) && !lrows.error) {
+          setFriendLogs(lrows.map(l => ({
+            cafe: l.cafe, date: l.date, drinks: l.drinks || [],
+            chugs: l.chugs, notes: l.notes, amenities: l.amenities || [],
+            studyRating: l.study_rating, drinkRating: l.drink_rating,
+            avgPrice: l.avg_price, labels: l.labels || [],
+            ingredient: l.ingredient || null,
+            isHomemade: l.is_homemade || !!l.ingredient || false,
+            location: l.location || "",
+          })));
+        } else setFriendLogs([]);
+      } catch (e) {
+        setFriendUser(null);
+        setFriendLogs([]);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [friendId]);
+
+  if (loading) {
+    return (
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: parentC.bg, zIndex: 101, display: "flex", flexDirection: "column" }}>
+        <Logo onBack={onBack} />
+        <div style={{ color: parentC.textMuted, textAlign: "center", marginTop: 40, fontSize: 14 }}>loading…</div>
+      </div>
+    );
+  }
+
+  if (!friendUser) {
+    return (
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: parentC.bg, zIndex: 101, display: "flex", flexDirection: "column" }}>
+        <Logo onBack={onBack} />
+        <div style={{ color: parentC.textMuted, textAlign: "center", marginTop: 40, fontSize: 14 }}>user not found</div>
+      </div>
+    );
+  }
+
+  const th = THEMES[friendUser.theme] || THEMES.green;
+  const displayName = friendUser.barista_name || friendUser.username;
+  const joinedLabel = friendUser.joined_date
+    ? (typeof friendUser.joined_date === "string" ? friendUser.joined_date : new Date(friendUser.joined_date).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase())
+    : "";
+  const totalChugs = friendLogs.reduce((s, l) => s + (l.chugs || 0), 0);
+  const friendAvatar = mergeUserAvatar(friendUser);
+
+  return (
+    <ThemeContext.Provider value={th}>
+      <FriendCafeInner
+        displayName={displayName}
+        joinedLabel={joinedLabel}
+        totalChugs={totalChugs}
+        friendAvatar={friendAvatar}
+        myAvatar={myAvatar}
+        myBaristaName={myBaristaName}
+        onBack={onBack}
+      />
+    </ThemeContext.Provider>
+  );
+}
+
+function FriendCafeInner({ displayName, joinedLabel, totalChugs, friendAvatar, myAvatar, myBaristaName, onBack }) {
+  const C = useC();
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: C.bg, zIndex: 101, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <Logo onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 28px 24px" }}>
+        <div style={{ marginBottom: 16, marginTop: 8, textAlign: "center" }}>
+          <div className="tight-stack" style={{ color: C.text, fontSize: 32, fontWeight: "bold", letterSpacing: "0.02em" }}>{displayName}&apos;s cafe</div>
+          {joinedLabel ? <div className="tight-stack" style={{ color: C.textMuted, fontSize: 11, marginTop: 6, letterSpacing: "0.06em" }}>joined {joinedLabel}</div> : null}
+          <div style={{ color: C.textMuted, fontSize: 13, marginTop: 10 }}>{totalChugs} chugs logged</div>
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, borderTop: `1px solid ${C.border}`, padding: "12px 24px 28px", display: "flex", justifyContent: "space-around", alignItems: "flex-end", gap: 12, background: C.bg }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <span style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.06em" }}>you</span>
+          <BaristaAvatar avatar={myAvatar} size={56} />
+          <span style={{ color: C.text, fontSize: 11, maxWidth: 100, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" }}>{myBaristaName}</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <span style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.06em" }}>friend</span>
+          <BaristaAvatar avatar={friendAvatar} size={56} />
+          <span style={{ color: C.text, fontSize: 11, maxWidth: 100, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AvatarEditor({ avatar, setAvatar, theme, setTheme, baristaName, onClose }) {
   const C = useC();
   const skinTones = ["#fde8d0", "#f5c5a3", "#e8a882", "#d4956a", "#c68642", "#8d5524", "#4a2c0a"];
   const hairColors = ["#f5e6c8", "#c8a96e", "#8B5E3C", "#4a2c0a", "#1a1a1a", "#8b0000", "#6b3a8c"];
@@ -992,7 +1465,7 @@ function AvatarEditor({ avatar, setAvatar, theme, setTheme, username, onClose })
 
         {/* Name + avatar + gender */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "16px 28px 0" }}>
-          <div style={{ color: C.textMuted, fontSize: 13, letterSpacing: "0.08em", marginBottom: 8 }}>barista: <span style={{ color: C.text, fontWeight: 600 }}>{username}</span></div>
+          <div style={{ color: C.textMuted, fontSize: 13, letterSpacing: "0.08em", marginBottom: 8 }}>barista: <span style={{ color: C.text, fontWeight: 600 }}>{baristaName}</span></div>
           <BaristaAvatar avatar={avatar} size={80} />
           <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 8 }}>
             {["female", "neutral", "male"].map(g => (
@@ -1065,7 +1538,7 @@ function AvatarEditor({ avatar, setAvatar, theme, setTheme, username, onClose })
   );
 }
 
-function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCafes, userId, joinedDate, onLogAnother, appTheme, setAppTheme, avatar, setAvatar, communityStats }) {
+function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [], setRankedCafes, userId, joinedDate, onLogAnother, onOpenFriends = () => {}, appTheme, setAppTheme, avatar, setAvatar, communityStats }) {
   const C = useC();
   const [tab, setTab] = useState("cafe");
   const [listTab, setListTab] = useState("fave cafes");
@@ -1099,7 +1572,6 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
   const caffeineThisMonth = monthLogs.reduce((sum, l) => sum + (l.drinks || []).reduce((s, d) => s + (caffeineMg[d] || 60), 0), 0);
   const uniqueCafes = [...new Set(logs.map((l) => l.cafe))];
   const cafeCount = (name) => logs.filter((l) => l.cafe === name).length;
-  const favCafe = uniqueCafes.sort((a, b) => cafeCount(b) - cafeCount(a))[0];
   const pricedLogs = logs.filter(l => l.avgPrice != null);
   const avgPrice = pricedLogs.length > 0
     ? (pricedLogs.reduce((sum, l) => sum + l.avgPrice, 0) / pricedLogs.length)
@@ -1128,36 +1600,64 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 
   return (
     <div style={{ ...styles.screen, background: C.bg, padding: "0 0 0", position: "relative" }}>
-      {showAvatar && <AvatarEditor avatar={avatar} setAvatar={setAvatar} theme={theme} setTheme={setTheme} username={username} onClose={() => setShowAvatar(false)} />}
+      {showAvatar && <AvatarEditor avatar={avatar} setAvatar={setAvatar} theme={theme} setTheme={setTheme} baristaName={baristaName} onClose={() => setShowAvatar(false)} />}
       <div style={{ padding: "0 28px 0", display: tab === "cafe" ? "block" : "none" }}>
         <Logo />
         <div style={{ marginBottom: 20, position: "relative", lineHeight: 1.2 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
             <div className="tight-stack" style={{ color: C.text, fontSize: 36, fontWeight: "bold", textAlign: "center" }}>
-              {username}'s cafe
+              {baristaName}'s cafe
             </div>
-            <button
-            onClick={onLogAnother}
-            style={{
-              position: "absolute",
-              right: 0,
-              background: C.card,
-              border: "none",
-              borderRadius: "50%",
-              width: 36,
-              height: 36,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: C.text,
-              fontSize: 22,
-              lineHeight: 1,
-              flexShrink: 0,
-            }}
-          >
-            +
-          </button>
+            <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)" }}>
+              <button
+                type="button"
+                onClick={onOpenFriends}
+                aria-label="friends"
+                style={{
+                  background: C.card,
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 36,
+                  height: 36,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: C.text,
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
+            </div>
+            <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)" }}>
+              <button
+                type="button"
+                onClick={onLogAnother}
+                style={{
+                  background: C.card,
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 36,
+                  height: 36,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: C.text,
+                  fontSize: 22,
+                  lineHeight: 1,
+                  flexShrink: 0,
+                }}
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="tight-stack" style={{ color: C.textMuted, fontSize: 11, textAlign: "center", letterSpacing: "0.06em", marginTop: 3 }}>joined {joinedLabel}</div>
         </div>
@@ -1311,7 +1811,7 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
           fullList={rankedCafes}
           renderRow={(cafe) => <span style={{ flex: 1 }}>{cafe}</span>}
           empty="no ranked cafes yet"
-          footer={(() => { if (!communityStats || !communityStats.drinkTotals) return ""; const myMatcha = logs.reduce((s,l) => (l.drinks||[]).includes("matcha") ? s+(l.chugs||1) : s, 0); const total = communityStats.drinkTotals.matcha || 0; if (!myMatcha || !total) return ""; const pct = Math.round(myMatcha/total*100); return `you're ${pct}% of matcha on com 🍵`; })()}
+          footer={(() => { if (!communityStats || !communityStats.drinkTotals) return ""; const dt = communityStats.drinkTotals; const totalAll = Object.values(dt).reduce((a, b) => a + b, 0); const myAll = logs.reduce((s, l) => { const ch = l.chugs || 1; return s + (l.drinks || []).reduce((t, d) => t + (Object.prototype.hasOwnProperty.call(dt, d) ? ch : 0), 0); }, 0); if (!myAll || !totalAll) return ""; const pct = Math.round((myAll / totalAll) * 100); return `you are ${pct}% of all drinks chugged on com 🍵`; })()}
           onNavigate={() => { setTab("your lists"); setListTab("fave cafes"); }}
         />
 
@@ -1894,14 +2394,13 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
 
             {/* Community stats */}
             {communityStats && communityStats.totalLogs > 0 && (() => {
-              const myMatcha = logs.reduce((s, l) => (l.drinks||[]).includes("matcha") ? s + (l.chugs||1) : s, 0);
-              const totalMatcha = communityStats.drinkTotals.matcha || 0;
-              const matchaPct = totalMatcha > 0 ? Math.round(myMatcha / totalMatcha * 100) : 0;
-              // Find fave cafe (most visited by this user) and its global rank
-              const myCafes = [...new Set(logs.map(l => l.cafe))];
-              const myVisitCount = (c) => logs.filter(l => l.cafe === c).length;
-              const favCafe = myCafes.length > 0 ? myCafes.reduce((a,b) => myVisitCount(a) >= myVisitCount(b) ? a : b) : null;
+              const myTotalChugs = logs.reduce((s, l) => s + (l.chugs || 1), 0);
+              const myCafes = [...new Set(logs.map(l => l.cafe).filter(Boolean))];
+              const myVisitCounts = myCafes.map(c => ({ cafe: c, count: logs.filter(l => l.cafe === c && !l.isHomemade).length }));
+              const favCafe = myVisitCounts.sort((a, b) => b.count - a.count)[0]?.cafe;
+              console.log('favCafe', favCafe, 'myVisitCounts', myVisitCounts);
               const globalCafeRanks = Object.entries(communityStats.cafeVisits).sort((a,b) => b[1]-a[1]);
+              console.log('globalCafeRanks', globalCafeRanks.slice(0, 5));
               const favCafeRank = favCafe ? globalCafeRanks.findIndex(([c]) => c === favCafe) + 1 : null;
               return (
                 <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 12 }}>
@@ -1911,14 +2410,14 @@ function ProfileScreen({ username, logs, setLogs, rankedCafes = [], setRankedCaf
                       you're <span style={{ fontWeight: "700" }}>top #{favCafeRank}</span> at <span style={{ fontWeight: "700" }}>{favCafe}</span>
                     </div>
                   )}
-                  {myMatcha > 0 && totalMatcha > 0 && (() => {
-                    // percentile: what % of users drink LESS matcha than me
-                    const allUserMatcha = communityStats.userMatchaChugs || [];
-                    const below = allUserMatcha.filter(n => n < myMatcha).length;
-                    const topPct = allUserMatcha.length > 1 ? Math.round((1 - below / allUserMatcha.length) * 100) : matchaPct;
+                  {myTotalChugs > 0 && (communityStats.userChugTotals || []).length > 0 && (() => {
+                    const myTotalChugs = logs.reduce((s, l) => s + (l.chugs || 1), 0);
+                    const allUserChugs = communityStats.userChugTotals || [];
+                    const below = allUserChugs.filter(n => n < myTotalChugs).length;
+                    const topPct = Math.min(100, allUserChugs.length > 1 ? Math.round((1 - below / allUserChugs.length) * 100) : 100);
                     return (
                       <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
-                        you are in the top <span style={{ fontWeight: "700" }}>{topPct}%</span> of com chuggers 🍵
+                        {`you are in the top ${topPct}% of com chuggers 🍵`}
                       </div>
                     );
                   })()}
@@ -2210,6 +2709,7 @@ export default function App() {
   const [avatar, setAvatar] = useState({ gender: "female", skin: "#f5c5a3", hair: "#4a2c0a", outfit: "#8b6b4a", apron: "#6b4a2a", pockets: "#4a2c0a" });
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState("");
+  const [baristaName, setBaristaName] = useState("");
   const [logs, setLogs] = useState([]);
   const [currentLog, setCurrentLog] = useState({});
   const [isNewCafe, setIsNewCafe] = useState(false);
@@ -2221,6 +2721,29 @@ export default function App() {
   const [fromProfile, setFromProfile] = useState(false);
   const [communityStats, setCommunityStats] = useState(null);
   const [sharedCafes, setSharedCafes] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [showFriends, setShowFriends] = useState(false);
+  const [friendViewId, setFriendViewId] = useState(null);
+
+  const loadFriends = async (uid) => {
+    if (!uid) return;
+    try {
+      const rows = await sb.get("friends", `or=(requester_id.eq.${uid},receiver_id.eq.${uid})&status=eq.accepted&select=*`);
+      if (!rows || rows.error || !Array.isArray(rows) || rows.length === 0) {
+        setFriends([]);
+        return;
+      }
+      const otherIds = [...new Set(rows.map(r => (r.requester_id === uid ? r.receiver_id : r.requester_id)).filter(Boolean))];
+      if (otherIds.length === 0) {
+        setFriends([]);
+        return;
+      }
+      const users = await sb.get("users", `id=in.(${otherIds.join(",")})&select=id,username,barista_name,avatar,theme,ranked_cafes,joined_date`);
+      setFriends(Array.isArray(users) ? users : []);
+    } catch (e) {
+      setFriends([]);
+    }
+  };
 
   const loadSharedCafes = async () => {
     try {
@@ -2237,21 +2760,27 @@ export default function App() {
       const drinkTotals = { matcha: 0, hojicha: 0, tea: 0, coffee: 0 };
       const cafeVisits = {};
       const perUserMatcha = {};
+      const perUserChugs = {};
       allLogs.forEach(l => {
         (l.drinks || []).forEach(d => { if (drinkTotals[d] !== undefined) drinkTotals[d] += (l.chugs || 1); });
         if (l.cafe) cafeVisits[l.cafe] = (cafeVisits[l.cafe] || 0) + 1;
         if (l.user_id && (l.drinks||[]).includes("matcha")) {
           perUserMatcha[l.user_id] = (perUserMatcha[l.user_id] || 0) + (l.chugs || 1);
         }
+        if (l.user_id) perUserChugs[l.user_id] = (perUserChugs[l.user_id] || 0) + (l.chugs || 1);
       });
       const userMatchaChugs = Object.values(perUserMatcha);
-      setCommunityStats({ drinkTotals, cafeVisits, totalLogs: allLogs.length, userMatchaChugs });
+      const userChugTotals = Object.values(perUserChugs);
+      console.log('userMatchaChugs', userMatchaChugs);
+      console.log('perUserChugs', perUserChugs);
+      setCommunityStats({ drinkTotals, cafeVisits, totalLogs: allLogs.length, userMatchaChugs, userChugTotals });
     } catch(e) {}
   };
 
   const handleLogin = async (userRow) => {
     setUserId(userRow.id);
     setUsername(userRow.username);
+    setBaristaName(userRow.barista_name || userRow.username);
     setRankedCafes(userRow.ranked_cafes || []);
     const t = userRow.theme || "green";
     setAppTheme(t);
@@ -2276,6 +2805,7 @@ export default function App() {
     } catch(e) {}
     await loadCommunityStats();
     await loadSharedCafes();
+    await loadFriends(userRow.id);
     setScreen("cafe-entry");
   };
 
@@ -2431,8 +2961,25 @@ export default function App() {
         })()}
         {screen === "profile" && (
           <>
-            <ProfileScreen username={username} logs={logs} setLogs={setLogs} rankedCafes={rankedCafes} setRankedCafes={setRankedCafes} userId={userId} joinedDate={joinedDate} onLogAnother={() => { setFromProfile(true); setScreen("cafe-entry"); }} appTheme={appTheme} setAppTheme={handleSetTheme} avatar={avatar} setAvatar={handleSetAvatar} communityStats={communityStats} />
+            <ProfileScreen username={username} baristaName={baristaName} logs={logs} setLogs={setLogs} rankedCafes={rankedCafes} setRankedCafes={setRankedCafes} userId={userId} joinedDate={joinedDate} onLogAnother={() => { setFromProfile(true); setScreen("cafe-entry"); }} onOpenFriends={() => setShowFriends(true)} appTheme={appTheme} setAppTheme={handleSetTheme} avatar={avatar} setAvatar={handleSetAvatar} communityStats={communityStats} />
           </>
+        )}
+        {showFriends && userId && (
+          <FriendsScreen
+            userId={userId}
+            friends={friends}
+            onClose={() => setShowFriends(false)}
+            onViewFriend={(id) => { setFriendViewId(id); setShowFriends(false); }}
+            onFriendsChanged={() => loadFriends(userId)}
+          />
+        )}
+        {friendViewId && (
+          <FriendCafeScreen
+            friendId={friendViewId}
+            onBack={() => { setFriendViewId(null); setShowFriends(true); }}
+            myAvatar={avatar}
+            myBaristaName={baristaName}
+          />
         )}
       </div>
     </div>

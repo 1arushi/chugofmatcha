@@ -1918,10 +1918,9 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
           </div>
         ) : !readOnly ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 12 }}>
-            <div onClick={() => setShowAvatar(true)} style={{ cursor: "pointer", marginBottom: -8 }}>
+            <div onClick={() => setShowAvatar(true)} style={{ cursor: "pointer" }}>
               <BaristaAvatar avatar={avatar} size={70} />
             </div>
-            <div style={{ width: 70, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.15)", filter: "blur(4px)", marginTop: -10 }} />
           </div>
         ) : null}
       </div>

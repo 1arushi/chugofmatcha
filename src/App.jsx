@@ -93,6 +93,31 @@ function hashPassword(str) {
   return (hash >>> 0).toString(36);
 }
 
+/** Cafe + location identity for lists (matches log fields). */
+function cafeDisplayKey(l) {
+  const loc = l.location && String(l.location).trim();
+  return loc ? `${l.cafe} · ${loc}` : l.cafe;
+}
+function parseCafeKey(key) {
+  const sep = " · ";
+  const i = key.indexOf(sep);
+  if (i === -1) return { cafe: key, location: "" };
+  return { cafe: key.slice(0, i), location: key.slice(i + sep.length) };
+}
+function logMatchesCafeKey(l, key) {
+  if (l.isHomemade || !l.cafe) return false;
+  return cafeDisplayKey(l) === key;
+}
+/** PostgREST filter for all logs of one user at one cafe+location slot. */
+function supabaseLogsFilterForUserKey(userId, key) {
+  const { cafe, location } = parseCafeKey(key);
+  const locTrim = location && location.trim();
+  const uid = `user_id=eq.${userId}`;
+  const cafeF = `cafe=eq.${encodeURIComponent(cafe)}`;
+  if (locTrim) return `${uid}&${cafeF}&location=eq.${encodeURIComponent(locTrim)}`;
+  return `${uid}&${cafeF}&or=(location.is.null,location.eq.)`;
+}
+
 const ThemeContext = createContext(THEMES.green);
 // Keep C as a fallback for components that haven't migrated to context
 // All components should use useC() hook instead
@@ -1229,7 +1254,30 @@ function FriendsScreen({ userId, friends, onClose, onViewFriend, onFriendsChange
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: C.bg, zIndex: 100, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 20 }}>
-        <Logo onBack={onClose} />
+      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "52px 28px 16px" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              position: "absolute",
+              left: 28,
+              top: "auto",
+              bottom: "28",
+              transform: "none",
+              background: "none",
+              border: "none",
+              color: C.textMuted,
+              fontSize: 22,
+              cursor: "pointer",
+              padding: 0,
+              fontFamily: "'Instrument Serif', serif",
+              lineHeight: 1,
+            }}
+          >
+            ‹
+          </button>
+          <span className="logo-text" style={{ color: C.textMuted, fontSize: 16, letterSpacing: "0.08em" }}>chugofmatcha</span>
+        </div>
         <div style={{ padding: "0 28px 50px" }}>
           <div style={{ color: C.text, fontSize: 18, marginBottom: 16, letterSpacing: "0.04em", textAlign: "center" }}>
             friends
@@ -1331,7 +1379,7 @@ function FriendsScreen({ userId, friends, onClose, onViewFriend, onFriendsChange
   );
 }
 
-function FriendCafeScreen({ friendId, onBack, myAvatar, myBaristaName }) {
+function FriendCafeScreen({ friendId, onBack, myAvatar, communityStats }) {
   const [friendUser, setFriendUser] = useState(null);
   const [friendLogs, setFriendLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1369,70 +1417,60 @@ function FriendCafeScreen({ friendId, onBack, myAvatar, myBaristaName }) {
 
   if (loading) {
     return (
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: parentC.bg, zIndex: 101, display: "flex", flexDirection: "column" }}>
-        <Logo onBack={onBack} />
-        <div style={{ color: parentC.textMuted, textAlign: "center", marginTop: 40, fontSize: 14 }}>loading…</div>
-      </div>
+      <ThemeContext.Provider value={parentC}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: parentC.bg, zIndex: 101, display: "flex", flexDirection: "column" }}>
+          <Logo onBack={onBack} />
+          <div style={{ color: parentC.textMuted, textAlign: "center", marginTop: 40, fontSize: 14 }}>loading…</div>
+        </div>
+      </ThemeContext.Provider>
     );
   }
 
   if (!friendUser) {
     return (
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: parentC.bg, zIndex: 101, display: "flex", flexDirection: "column" }}>
-        <Logo onBack={onBack} />
-        <div style={{ color: parentC.textMuted, textAlign: "center", marginTop: 40, fontSize: 14 }}>user not found</div>
-      </div>
+      <ThemeContext.Provider value={parentC}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: parentC.bg, zIndex: 101, display: "flex", flexDirection: "column" }}>
+          <Logo onBack={onBack} />
+          <div style={{ color: parentC.textMuted, textAlign: "center", marginTop: 40, fontSize: 14 }}>user not found</div>
+        </div>
+      </ThemeContext.Provider>
     );
   }
 
   const th = THEMES[friendUser.theme] || THEMES.green;
   const displayName = friendUser.barista_name || friendUser.username;
-  const joinedLabel = friendUser.joined_date
-    ? (typeof friendUser.joined_date === "string" ? friendUser.joined_date : new Date(friendUser.joined_date).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase())
-    : "";
-  const totalChugs = friendLogs.reduce((s, l) => s + (l.chugs || 0), 0);
   const friendAvatar = mergeUserAvatar(friendUser);
+
+  const rankedCafesFriend = Array.isArray(friendUser.ranked_cafes) ? friendUser.ranked_cafes : [];
 
   return (
     <ThemeContext.Provider value={th}>
-      <FriendCafeInner
-        displayName={displayName}
-        joinedLabel={joinedLabel}
-        totalChugs={totalChugs}
-        friendAvatar={friendAvatar}
-        myAvatar={myAvatar}
-        myBaristaName={myBaristaName}
-        onBack={onBack}
-      />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 101, display: "flex", flexDirection: "column", overflow: "hidden", background: th.bg }}>
+        <div style={{ position: "absolute", top: 52, left: 28, zIndex: 110 }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: th.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
+        </div>
+        <ProfileScreen
+          readOnly
+          onBack={null}
+          username={friendUser.username || ""}
+          baristaName={displayName}
+          logs={friendLogs}
+          setLogs={() => {}}
+          rankedCafes={rankedCafesFriend}
+          setRankedCafes={() => {}}
+          userId={friendId}
+          joinedDate={friendUser.joined_date}
+          onLogAnother={() => {}}
+          onOpenFriends={() => {}}
+          appTheme={friendUser.theme}
+          setAppTheme={() => {}}
+          avatar={friendAvatar}
+          setAvatar={() => {}}
+          communityStats={communityStats}
+          friendViewMyAvatar={myAvatar}
+        />
+      </div>
     </ThemeContext.Provider>
-  );
-}
-
-function FriendCafeInner({ displayName, joinedLabel, totalChugs, friendAvatar, myAvatar, myBaristaName, onBack }) {
-  const C = useC();
-  return (
-    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: C.bg, zIndex: 101, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <Logo onBack={onBack} />
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 28px 24px" }}>
-        <div style={{ marginBottom: 16, marginTop: 8, textAlign: "center" }}>
-          <div className="tight-stack" style={{ color: C.text, fontSize: 32, fontWeight: "bold", letterSpacing: "0.02em" }}>{displayName}&apos;s cafe</div>
-          {joinedLabel ? <div className="tight-stack" style={{ color: C.textMuted, fontSize: 11, marginTop: 6, letterSpacing: "0.06em" }}>joined {joinedLabel}</div> : null}
-          <div style={{ color: C.textMuted, fontSize: 13, marginTop: 10 }}>{totalChugs} chugs logged</div>
-        </div>
-      </div>
-      <div style={{ flexShrink: 0, borderTop: `1px solid ${C.border}`, padding: "12px 24px 28px", display: "flex", justifyContent: "space-around", alignItems: "flex-end", gap: 12, background: C.bg }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          <span style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.06em" }}>you</span>
-          <BaristaAvatar avatar={myAvatar} size={56} />
-          <span style={{ color: C.text, fontSize: 11, maxWidth: 100, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" }}>{myBaristaName}</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          <span style={{ color: C.textMuted, fontSize: 10, letterSpacing: "0.06em" }}>friend</span>
-          <BaristaAvatar avatar={friendAvatar} size={56} />
-          <span style={{ color: C.text, fontSize: 11, maxWidth: 100, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</span>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1538,7 +1576,7 @@ function AvatarEditor({ avatar, setAvatar, theme, setTheme, baristaName, onClose
   );
 }
 
-function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [], setRankedCafes, userId, joinedDate, onLogAnother, onOpenFriends = () => {}, appTheme, setAppTheme, avatar, setAvatar, communityStats }) {
+function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [], setRankedCafes, userId, joinedDate, onLogAnother, onOpenFriends = () => {}, appTheme, setAppTheme, avatar, setAvatar, communityStats, readOnly = false, onBack = null, friendViewMyAvatar = null }) {
   const C = useC();
   const [tab, setTab] = useState("cafe");
   const [listTab, setListTab] = useState("fave cafes");
@@ -1598,16 +1636,20 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
   // Joined date label
   const joinedLabel = joinedDate ? (typeof joinedDate === "string" ? joinedDate : joinedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase()) : "march 2026";
 
+  const titleSize = username.length > 8 ? (username.length > 12 ? 24 : 30) : 36;
+
   return (
-    <div style={{ ...styles.screen, background: C.bg, padding: "0 0 0", position: "relative" }}>
-      {showAvatar && <AvatarEditor avatar={avatar} setAvatar={setAvatar} theme={theme} setTheme={setTheme} baristaName={baristaName} onClose={() => setShowAvatar(false)} />}
+    <div style={{ ...styles.screen, background: C.bg, padding: "0 0 0", position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {showAvatar && !readOnly && <AvatarEditor avatar={avatar} setAvatar={setAvatar} theme={theme} setTheme={setTheme} baristaName={baristaName} onClose={() => setShowAvatar(false)} />}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
       <div style={{ padding: "0 28px 0", display: tab === "cafe" ? "block" : "none" }}>
-        <Logo />
+        <Logo onBack={readOnly && onBack ? onBack : undefined} />
         <div style={{ marginBottom: 20, position: "relative", lineHeight: 1.2 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-            <div className="tight-stack" style={{ color: C.text, fontSize: 36, fontWeight: "bold", textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", paddingLeft: 44, paddingRight: 44, minHeight: 44, boxSizing: "border-box" }}>
+            <div className="tight-stack" style={{ color: C.text, fontSize: titleSize, fontWeight: "bold", textAlign: "center", maxWidth: "100%", padding: "0 6px", lineHeight: 1.15 }}>
               {baristaName}'s cafe
             </div>
+            {!readOnly && (
             <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)" }}>
               <button
                 type="button"
@@ -1635,6 +1677,8 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                 </svg>
               </button>
             </div>
+            )}
+            {!readOnly && (
             <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)" }}>
               <button
                 type="button"
@@ -1658,6 +1702,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                 +
               </button>
             </div>
+            )}
           </div>
           <div className="tight-stack" style={{ color: C.textMuted, fontSize: 11, textAlign: "center", letterSpacing: "0.06em", marginTop: 3 }}>joined {joinedLabel}</div>
         </div>
@@ -1665,14 +1710,16 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
         {/* Cafe search */}
         <div style={{ marginBottom: 16, position: "relative" }}>
           <input
-            placeholder="search any cafe..."
+            placeholder={readOnly ? `search ${baristaName}'s cafes...` : "search any cafe..."}
             value={cafeSearch}
             onChange={e => { setCafeSearch(e.target.value); setCafeSearchResult(null); setCafeSearchOpen(e.target.value.trim().length > 0); }}
             onFocus={() => cafeSearch.trim().length > 0 && setCafeSearchOpen(true)}
             style={{ background: C.card, border: "none", borderRadius: 50, padding: "12px 20px", color: C.text, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "0.04em" }}
           />
           {cafeSearchOpen && (() => {
-            const allCafeNames = communityStats ? Object.keys(communityStats.cafeVisits) : [...new Set(logs.map(l => l.cafe))];
+            const allCafeNames = readOnly
+              ? [...new Set(logs.map(l => l.cafe).filter(Boolean))]
+              : (communityStats ? Object.keys(communityStats.cafeUserVisits || {}) : [...new Set(logs.map(l => l.cafe))]);
             const matches = allCafeNames.filter(c => c.toLowerCase().includes(cafeSearch.toLowerCase())).slice(0, 6);
             if (matches.length === 0) return null;
             return (
@@ -1681,6 +1728,31 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                   <div key={cafeName} onClick={async () => {
                     setCafeSearchOpen(false);
                     setCafeSearch(cafeName);
+                    if (readOnly) {
+                      const cafeLogs = logs.filter(l => l.cafe === cafeName);
+                      const hasOutlets = cafeLogs.some(l => (l.amenities || []).includes("outlets"));
+                      const hasWifi = cafeLogs.some(l => (l.amenities || []).includes("wifi"));
+                      const hasBathroom = cafeLogs.some(l => (l.amenities || []).includes("bathroom"));
+                      const studyRatings = cafeLogs.map(l => l.studyRating).filter((n) => n > 0);
+                      const drinkRatings = cafeLogs.map(l => l.drinkRating).filter((n) => n > 0);
+                      const prices = cafeLogs.map(l => l.avgPrice).filter((p) => p != null);
+                      const avgStudy = studyRatings.length > 0 ? studyRatings.reduce((a, b) => a + b, 0) / studyRatings.length : null;
+                      const avgDrink = drinkRatings.length > 0 ? drinkRatings.reduce((a, b) => a + b, 0) / drinkRatings.length : null;
+                      const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
+                      const friendNotes = [...new Set(cafeLogs.map(l => l.notes).filter((n) => n && String(n).trim()))];
+                      setCafeSearchResult({
+                        name: cafeName,
+                        readOnlyFriend: true,
+                        hasOutlets,
+                        hasWifi,
+                        hasBathroom,
+                        avgStudy,
+                        avgDrink,
+                        avgPrice,
+                        friendNotes,
+                      });
+                      return;
+                    }
                     try {
                       const cafeLogs = await sb.get("logs", `cafe=eq.${encodeURIComponent(cafeName)}&select=amenities,study_rating,drink_rating,avg_price,drinks,username`);
                       if (!cafeLogs || cafeLogs.error) return;
@@ -1751,10 +1823,12 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginBottom: 12 }}>
             <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em" }}>money spent this month</span>
+            {!readOnly && (
             <button onClick={() => { setEditingGoal(true); setGoalInput(spendingGoal > 0 ? String(spendingGoal) : ""); }} style={{ position: "absolute", right: 0, background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}>✎</button>
+            )}
           </div>
 
-          {editingGoal ? (
+          {!readOnly && editingGoal ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", padding: "4px 0" }}>
               <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>monthly goal ($)</div>
               <input
@@ -1767,7 +1841,24 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
               />
               <button onClick={() => { const g = parseFloat(goalInput) || 0; setSpendingGoal(g); try { localStorage.setItem("com_spending_goal", g); } catch(e2) {} setEditingGoal(false); }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "7px 20px", color: C.textDark, fontSize: 12, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>set goal</button>
             </div>
-          ) : (() => {
+          ) : (readOnly ? (() => {
+            const spent = spentThisMonth;
+            return (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ position: "relative", width: 84, height: 84, flexShrink: 0 }}>
+                  <svg width="84" height="84" viewBox="0 0 84 84">
+                    <circle cx="42" cy="42" r={30} fill="none" stroke={`${C.text}15`} strokeWidth="9" />
+                  </svg>
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ color: C.text, fontSize: 10, fontWeight: "700", textAlign: "center", lineHeight: 1.3 }}>—</div>
+                  </div>
+                </div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+                  <div style={{ color: C.text, fontSize: 26, fontWeight: "700", lineHeight: 1 }}>${spent.toFixed(2)}</div>
+                </div>
+              </div>
+            );
+          })() : (() => {
             const spent = spentThisMonth;
             const goal = spendingGoal;
             const pct = goal > 0 ? Math.min(spent / goal, 1) : 0;
@@ -1801,7 +1892,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                 </div>
               </div>
             );
-          })()}
+          })())}
         </div>
 
         {/* Best chugs */}
@@ -1811,17 +1902,28 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
           fullList={rankedCafes}
           renderRow={(cafe) => <span style={{ flex: 1 }}>{cafe}</span>}
           empty="no ranked cafes yet"
-          footer={(() => { if (!communityStats || !communityStats.drinkTotals) return ""; const dt = communityStats.drinkTotals; const totalAll = Object.values(dt).reduce((a, b) => a + b, 0); const myAll = logs.reduce((s, l) => { const ch = l.chugs || 1; return s + (l.drinks || []).reduce((t, d) => t + (Object.prototype.hasOwnProperty.call(dt, d) ? ch : 0), 0); }, 0); if (!myAll || !totalAll) return ""; const pct = Math.round((myAll / totalAll) * 100); return `you are ${pct}% of all drinks chugged on com 🍵`; })()}
+          footer={(() => { if (!communityStats || !communityStats.drinkTotals) return ""; const dt = communityStats.drinkTotals; const totalAll = Object.values(dt).reduce((a, b) => a + b, 0); const myAll = logs.reduce((s, l) => { const ch = l.chugs || 1; return s + (l.drinks || []).reduce((t, d) => t + (Object.prototype.hasOwnProperty.call(dt, d) ? ch : 0), 0); }, 0); if (!myAll || !totalAll) return ""; const pct = Math.round((myAll / totalAll) * 100); return readOnly ? `${baristaName} is ${pct}% of all drinks chugged on com 🍵` : `you are ${pct}% of all drinks chugged on com 🍵`; })()}
           onNavigate={() => { setTab("your lists"); setListTab("fave cafes"); }}
         />
 
-        {/* Avatar centered at bottom */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 12 }}>
-          <div onClick={() => setShowAvatar(true)} style={{ cursor: "pointer", marginBottom: -8 }}>
-            <BaristaAvatar avatar={avatar} size={70} />
+        {/* Avatar(s) at bottom of cafe tab */}
+        {readOnly && friendViewMyAvatar ? (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 20, marginTop: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <BaristaAvatar avatar={friendViewMyAvatar} size={70} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <BaristaAvatar avatar={avatar} size={70} />
+            </div>
           </div>
-          <div style={{ width: 70, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.15)", filter: "blur(4px)", marginTop: -10 }} />
-        </div>
+        ) : !readOnly ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 12 }}>
+            <div onClick={() => setShowAvatar(true)} style={{ cursor: "pointer", marginBottom: -8 }}>
+              <BaristaAvatar avatar={avatar} size={70} />
+            </div>
+            <div style={{ width: 70, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.15)", filter: "blur(4px)", marginTop: -10 }} />
+          </div>
+        ) : null}
       </div>
 
       {/* Your Lists Tab */}
@@ -1834,21 +1936,41 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
         const sortedHomemade = [...rankedHomemade, ...unrankedHomemade];
 
         const cafeLogs2 = logs.filter(l => !l.isHomemade && l.cafe !== "homemade");
-        const uniqueCafesOnly = [...new Set(cafeLogs2.map(l => l.cafe))];
-        const cafeCountOnly = (name) => cafeLogs2.filter(l => l.cafe === name).length;
+        const uniqueCafesOnly = [...new Set(cafeLogs2.map((l) => cafeDisplayKey(l)))];
+        const cafeCountOnly = (key) => cafeLogs2.filter((l) => cafeDisplayKey(l) === key).length;
         const sortedCafesOnly = [...uniqueCafesOnly].sort((a, b) => cafeCountOnly(b) - cafeCountOnly(a));
 
         const listDefs = {
-          "fave cafes": (() => { const ranked = rankedCafes.filter(c => uniqueCafesOnly.includes(c)); const unranked = uniqueCafesOnly.filter(c => !rankedCafes.includes(c)); return [...ranked, ...unranked]; })(),
+          "fave cafes": (() => {
+            const ordered = [];
+            const seen = new Set();
+            rankedCafes.forEach((c) => {
+              uniqueCafesOnly
+                .filter((k) => cafeLogs2.some((l) => cafeDisplayKey(l) === k && l.cafe === c))
+                .sort()
+                .forEach((k) => {
+                  if (!seen.has(k)) {
+                    seen.add(k);
+                    ordered.push(k);
+                  }
+                });
+            });
+            uniqueCafesOnly.filter((k) => !seen.has(k)).forEach((k) => ordered.push(k));
+            return ordered;
+          })(),
           "most visited": sortedCafesOnly,
           "best study": (() => {
             const cafeStudy = {};
-            cafeLogs2.forEach(l => { if (l.studyRating > 0 && (!cafeStudy[l.cafe] || l.studyRating > cafeStudy[l.cafe])) cafeStudy[l.cafe] = l.studyRating; });
+            cafeLogs2.forEach((l) => {
+              const k = cafeDisplayKey(l);
+              if (l.studyRating > 0 && (!cafeStudy[k] || l.studyRating > cafeStudy[k])) cafeStudy[k] = l.studyRating;
+            });
             return Object.keys(cafeStudy).sort((a, b) => {
               if (cafeStudy[b] !== cafeStudy[a]) return cafeStudy[b] - cafeStudy[a];
-              const ri = rankedCafes.indexOf(a), rj = rankedCafes.indexOf(b);
+              const ri = rankedCafes.indexOf(parseCafeKey(a).cafe), rj = rankedCafes.indexOf(parseCafeKey(b).cafe);
               if (ri === -1 && rj === -1) return 0;
-              if (ri === -1) return 1; if (rj === -1) return -1;
+              if (ri === -1) return 1;
+              if (rj === -1) return -1;
               return ri - rj;
             });
           })(),
@@ -1857,9 +1979,9 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
         const listTabs = ["fave cafes", "most visited", "homemade"];
         const activeList = listDefs[listTab] || [];
 
-        // Build cafe detail from all logs for that cafe
-        const getCafeDetail = (cafeName) => {
-          const cafeLogs = logs.filter(l => l.cafe === cafeName);
+        // Build cafe detail from all logs for that cafe+location key
+        const getCafeDetail = (cafeKey) => {
+          const cafeLogs = cafeLogs2.filter((l) => cafeDisplayKey(l) === cafeKey);
           const visits = cafeLogs.length;
           const bestStudy = Math.max(...cafeLogs.map(l => l.studyRating || 0), 0);
           const bestDrink = Math.max(...cafeLogs.map(l => l.drinkRating || 0), 0);
@@ -1887,12 +2009,14 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
           return (
             <div style={{ ...styles.screen, background: C.bg, padding: "0 28px", overflowY: "auto" }}>
               <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "52px 0 24px" }}>
-                <button onClick={() => { setSelectedHomemade(null); setEditingCafe(false); }} style={{ position: "absolute", left: 0, background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
+                <button onClick={() => { setSelectedHomemade(null); setEditingCafe(false); }} style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
                 <div style={{ color: C.text, fontSize: 22, fontWeight: "bold" }}>{selectedHomemade}</div>
+                {!readOnly && (
                 <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ ingredient, notes: allNotes.join(", "), rating: bestRating }); }} style={{ position: "absolute", right: 0, background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>✎</button>
+                )}
               </div>
 
-              {editingCafe && (
+              {!readOnly && editingCafe && (
                 <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 14 }}>
                   <div style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.06em", marginBottom: 6 }}>{ingredientLabel}</div>
                   <input value={editForm.ingredient || ""} onChange={e => setEditForm(f => ({...f, ingredient: e.target.value}))}
@@ -1963,7 +2087,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
             <div style={{ padding: "0 28px", flex: 1, display: "flex", flexDirection: "column" }}>
               {/* Header */}
               <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "52px 0 16px" }}>
-                <button onClick={() => { setSelectedCafe(null); setEditingCafe(false); }} style={{ position: "absolute", left: 0, background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
+                <button onClick={() => { setSelectedCafe(null); setEditingCafe(false); }} style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, fontFamily: "'Instrument Serif', serif", lineHeight: 1 }}>‹</button>
                 <span className="logo-text" style={{ color: C.textMuted, fontSize: 16, letterSpacing: "0.08em" }}>chugofmatcha</span>
 
               </div>
@@ -1971,10 +2095,24 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
               {/* Cafe name + visits */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ color: C.text, fontSize: 26, fontWeight: "bold", lineHeight: 1 }}>{selectedCafe}</div>
-                  <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => l.cafe === selectedCafe && l.notes).map(l => l.notes).join(", "), labels: [...d.allLabels] }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {(() => {
+                      const { cafe: cn, location: loc } = parseCafeKey(selectedCafe);
+                      return (
+                        <>
+                          <div style={{ color: C.text, fontSize: 26, fontWeight: "bold", lineHeight: 1 }}>{cn}</div>
+                          {loc && loc.trim() ? (
+                            <div style={{ color: C.textMuted, fontSize: 12, marginTop: 4, letterSpacing: "0.04em" }}>{loc.trim()}</div>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
+                  {!readOnly && (
+                  <button onClick={() => { setEditingCafe(!editingCafe); setEditForm({ studyRating: d.bestStudy, drinkRating: d.bestDrink, avgPrice: d.avgP || 8, notes: logs.filter(l => logMatchesCafeKey(l, selectedCafe) && l.notes).map(l => l.notes).join(", "), labels: [...d.allLabels] }); }} style={{ background: "none", border: "none", color: editingCafe ? C.text : C.textMuted, fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>✎</button>
+                  )}
                 </div>
-                {d.locations.length > 0 && (
+                {!parseCafeKey(selectedCafe).location.trim() && d.locations.length > 0 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
                     <svg width="9" height="11" viewBox="0 0 13 16" fill="none"><path d="M6.5 0C4.01 0 2 2.01 2 4.5c0 3.375 4.5 9 4.5 9s4.5-5.625 4.5-9C11 2.01 8.99 0 6.5 0zm0 6.125A1.625 1.625 0 1 1 6.5 2.875a1.625 1.625 0 0 1 0 3.25z" fill="currentColor"/></svg>
                     <span style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.04em" }}>{d.locations.join(", ")}</span>
@@ -1983,7 +2121,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                 <div style={{ color: C.textMuted, fontSize: 12, marginTop: 3, letterSpacing: "0.04em" }}>visited {d.visits}x</div>
               </div>
 
-              {editingCafe && (
+              {!readOnly && editingCafe && (
                 <div style={{ background: C.card, borderRadius: 18, padding: "18px 20px", marginBottom: 12 }}>
                   <div style={{ color: C.text, fontSize: 14, marginBottom: 14, letterSpacing: "0.04em", textAlign: "center" }}>edit your review</div>
 
@@ -2014,15 +2152,15 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                   <button onClick={async () => {
                     // Price edit only applies to future logs (add a priceOverride marker on the cafe)
                     // Update ratings/notes/labels on all logs, but only update avgPrice on the latest log
-                    const cafeLogs = prev => prev.filter(l => l.cafe === selectedCafe);
+                    const key = selectedCafe;
                     setLogs(prev => {
-                      const sorted = [...prev].sort((a,b) => new Date(b.date) - new Date(a.date));
-                      const latestIdx = sorted.findIndex(l => l.cafe === selectedCafe);
-                      return prev.map((l, i) => l.cafe !== selectedCafe ? l : {
+                      const matching = prev.filter((l) => logMatchesCafeKey(l, key));
+                      const latest = [...matching].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                      return prev.map((l) => !logMatchesCafeKey(l, key) ? l : {
                         ...l,
                         studyRating: editForm.studyRating ?? l.studyRating,
                         drinkRating: editForm.drinkRating ?? l.drinkRating,
-                        avgPrice: l === sorted[latestIdx] ? (editForm.avgPrice ?? l.avgPrice) : l.avgPrice,
+                        avgPrice: latest && l === latest ? (editForm.avgPrice ?? l.avgPrice) : l.avgPrice,
                         notes: editForm.notes ?? l.notes,
                         labels: editForm.labels ?? l.labels,
                       });
@@ -2030,7 +2168,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                     // Save to Supabase
                     if (userId) {
                       try {
-                        await sb.patch("logs", `user_id=eq.${userId}&cafe=eq.${encodeURIComponent(selectedCafe)}`, {
+                        await sb.patch("logs", supabaseLogsFilterForUserKey(userId, key), {
                           study_rating: editForm.studyRating,
                           drink_rating: editForm.drinkRating,
                           avg_price: editForm.avgPrice,
@@ -2087,7 +2225,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                   {(editingCafe ? (editForm.labels||[]) : d.allLabels).map(l => (
                     <span key={l} style={{ background: C.card, border: `2px solid ${C.border}`, borderRadius: 50, padding: "7px 16px", color: C.text, fontSize: 12, letterSpacing: "0.03em", display: "flex", alignItems: "center", gap: 6 }}>
                       {l}
-                      {editingCafe && (
+                      {!readOnly && editingCafe && (
                         <button onClick={() => setEditForm(f => ({ ...f, labels: (f.labels||[]).filter(x => x !== l) }))}
                           style={{ background: "none", border: "none", color: C.textMuted, fontSize: 14, cursor: "pointer", padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
                       )}
@@ -2105,7 +2243,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                   ))}
                 </div>
               )}
-              {editingCafe && (
+              {!readOnly && editingCafe && (
                 <div style={{ display: "flex", justifyContent: "center", marginTop: 8, marginBottom: 8 }}>
                   <button onClick={() => setConfirmDelete(true)}
                     style={{ background: "none", border: "none", color: `${C.text}35`, fontSize: 20, cursor: "pointer", padding: "8px 20px", lineHeight: 1, fontFamily: "Inter, sans-serif", letterSpacing: "0.04em" }}>
@@ -2113,27 +2251,36 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                   </button>
                 </div>
               )}
-              {confirmDelete && (
+              {!readOnly && confirmDelete && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
                   <div style={{ background: C.card, borderRadius: 24, padding: "28px 24px", margin: "0 32px", textAlign: "center" }}>
-                    <div style={{ color: C.text, fontSize: 16, marginBottom: 8 }}>delete {selectedCafe}?</div>
+                    <div style={{ color: C.text, fontSize: 16, marginBottom: 8 }}>delete {(() => { const p = parseCafeKey(selectedCafe); return `${p.cafe}${p.location.trim() ? ` · ${p.location.trim()}` : ""}`; })()}?</div>
                     <div style={{ color: C.textMuted, fontSize: 13, marginBottom: 24 }}>this removes all your logs for this cafe</div>
                     <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
                       <button onClick={() => setConfirmDelete(false)} style={{ background: "none", border: `2px solid ${C.border}`, borderRadius: 50, padding: "10px 24px", color: C.textMuted, fontSize: 14, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>cancel</button>
-                      <button onClick={async () => {
-                        const cafe = selectedCafe;
-                        setLogs(prev => prev.filter(l => l.cafe !== cafe));
-                        const newRanked = rankedCafes.filter(c => c !== cafe);
-                        setRankedCafes(newRanked);
+                      <button onClick={() => {
+                        const key = selectedCafe;
+                        const baseName = parseCafeKey(key).cafe;
+                        setLogs((prev) => {
+                          const next = prev.filter((l) => !logMatchesCafeKey(l, key));
+                          const stillHas = next.some((l) => !l.isHomemade && l.cafe === baseName);
+                          setRankedCafes((r) => {
+                            const nr = stillHas ? r : r.filter((c) => c !== baseName);
+                            if (userId) {
+                              (async () => {
+                                try {
+                                  await sb.delete("logs", supabaseLogsFilterForUserKey(userId, key));
+                                  await sb.patch("users", `id=eq.${userId}`, { ranked_cafes: nr });
+                                } catch (e) {}
+                              })();
+                            }
+                            return nr;
+                          });
+                          return next;
+                        });
                         setSelectedCafe(null);
                         setEditingCafe(false);
                         setConfirmDelete(false);
-                        if (userId) {
-                          try {
-                            await sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked });
-                            await sb.delete("logs", `user_id=eq.${userId}&cafe=eq.${encodeURIComponent(cafe)}`);
-                          } catch(e) {}
-                        }
                       }} style={{ background: C.text, border: "none", borderRadius: 50, padding: "10px 24px", color: C.textDark, fontSize: 14, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>delete</button>
                     </div>
                   </div>
@@ -2146,8 +2293,10 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
         return (
           <div style={{ padding: "0 28px", flex: 1, display: "flex", flexDirection: "column" }}>
             <div style={{ position: "relative" }}>
-              <Logo />
+              <Logo onBack={readOnly && onBack ? onBack : undefined} />
+              {!readOnly && (
               <button onClick={() => setTab("cafe")} style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, lineHeight: 1, paddingTop: 52 }}>‹</button>
+              )}
             </div>
             {/* Tab pills + filter button */}
             <div style={{ display: "flex", gap: 8, flexWrap: "nowrap", marginBottom: showFilters ? 12 : 20, marginTop: 4, justifyContent: "center", alignItems: "center" }}>
@@ -2199,21 +2348,33 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
 
             <div style={{ flex: 1 }}>
               {(() => {
-                const filteredList = activeList.filter(cafe => {
-                  const cafeLogs = logs.filter(l => l.cafe === cafe);
-                  const amenities = cafeLogs.flatMap(l => l.amenities || []);
-                  const pricedLogs = cafeLogs.filter(l => l.avgPrice != null);
+                const filteredList = activeList.filter((cafeKey) => {
+                  const cafeLogs = listTab === "homemade"
+                    ? logs.filter((l) => l.isHomemade && l.cafe === cafeKey)
+                    : cafeLogs2.filter((l) => cafeDisplayKey(l) === cafeKey);
+                  const amenities = cafeLogs.flatMap((l) => l.amenities || []);
+                  const pricedLogs = cafeLogs.filter((l) => l.avgPrice != null);
                   const avgP = pricedLogs.length > 0 ? pricedLogs.reduce((s, l) => s + l.avgPrice, 0) / pricedLogs.length : null;
 
                   for (const f of activeFilters) {
+                    if (f.startsWith("loc:")) {
+                      const loc = f.slice(4);
+                      if (!cafeLogs.some((l) => (l.location || "").trim() === loc)) return false;
+                      continue;
+                    }
+                    if (f === "best-study") {
+                      const best = Math.max(...cafeLogs.map((l) => l.studyRating || 0), 0);
+                      if (best <= 0) return false;
+                      continue;
+                    }
                     if (f === "outlets" && !amenities.includes("outlets")) return false;
                     if (f === "wifi" && !amenities.includes("wifi")) return false;
                     if (f === "bathroom" && !amenities.includes("bathroom")) return false;
                     if (f === "price-low" && (avgP === null || avgP >= 7)) return false;
                     if (f === "price-mid" && (avgP === null || avgP < 7 || avgP > 9)) return false;
                     if (f === "price-high" && (avgP === null || avgP <= 9)) return false;
-                    if (!["outlets","wifi","bathroom","price-low","price-mid","price-high"].includes(f)) {
-                      const allLabels = cafeLogs.flatMap(l => l.labels || []);
+                    if (!["outlets","wifi","bathroom","price-low","price-mid","price-high","best-study"].includes(f) && !f.startsWith("loc:")) {
+                      const allLabels = cafeLogs.flatMap((l) => l.labels || []);
                       if (!allLabels.includes(f)) return false;
                     }
                   }
@@ -2243,11 +2404,32 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                   return (
                     <div key={cafe + i} onClick={() => setSelectedCafe(cafe)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `1px solid ${C.border}`, color: C.text, cursor: "pointer" }}>
                       <span style={{ color: C.textMuted, fontSize: 13, marginRight: 12, minWidth: 20 }}>{i + 1}</span>
-                      <span style={{ flex: 1, fontSize: 14 }}>{cafe}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        {listTab === "fave cafes" || listTab === "most visited" ? (() => {
+                          const fromLog = logs.find((l) => cafeDisplayKey(l) === cafe && l.location)?.location;
+                          const cafeLocation = (fromLog && String(fromLog).trim()) || parseCafeKey(cafe).location.trim();
+                          return (
+                            <span style={{ flex: 1, fontSize: 14 }}>
+                              {parseCafeKey(cafe).cafe}
+                              {cafeLocation ? <span style={{ color: C.textMuted, fontSize: 11, marginLeft: 6 }}>· {cafeLocation}</span> : null}
+                            </span>
+                          );
+                        })() : (() => {
+                          const { cafe: rowName, location: rowLoc } = parseCafeKey(cafe);
+                          return (
+                            <>
+                              <span style={{ fontSize: 14, display: "block" }}>{rowName}</span>
+                              {rowLoc && rowLoc.trim() ? (
+                                <span style={{ fontSize: 11, color: C.textMuted, letterSpacing: "0.03em", display: "block", marginTop: 2 }}>{rowLoc.trim()}</span>
+                              ) : null}
+                            </>
+                          );
+                        })()}
+                      </span>
                       {listTab === "best study" ? (
-                        <span style={{ color: C.textMuted, fontSize: 13 }}>{"★".repeat(Math.max(...logs.filter(l => l.cafe === cafe && l.studyRating > 0).map(l => l.studyRating), 0))}</span>
+                        <span style={{ color: C.textMuted, fontSize: 13 }}>{"★".repeat((() => { const sr = cafeLogs2.filter((l) => cafeDisplayKey(l) === cafe && l.studyRating > 0).map((l) => l.studyRating); return sr.length ? Math.max(...sr) : 0; })())}</span>
                       ) : (
-                        <span style={{ color: C.textMuted, fontSize: 13 }}>{cafeCount(cafe)}</span>
+                        <span style={{ color: C.textMuted, fontSize: 13 }}>{cafeCountOnly(cafe)}</span>
                       )}
                       <span style={{ color: C.textMuted, fontSize: 16, marginLeft: 8 }}>›</span>
                     </div>
@@ -2304,8 +2486,10 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
         return (
           <div style={{ padding: "0 28px", flex: 1, display: "flex", flexDirection: "column" }}>
             <div style={{ position: "relative" }}>
-              <Logo />
+              <Logo onBack={readOnly && onBack ? onBack : undefined} />
+              {!readOnly && (
               <button onClick={() => setTab("cafe")} style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: 22, cursor: "pointer", padding: 0, lineHeight: 1, paddingTop: 52 }}>‹</button>
+              )}
             </div>
 
             {/* Stats top row */}
@@ -2394,30 +2578,33 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
 
             {/* Community stats */}
             {communityStats && communityStats.totalLogs > 0 && (() => {
-              const myTotalChugs = logs.reduce((s, l) => s + (l.chugs || 1), 0);
-              const myCafes = [...new Set(logs.map(l => l.cafe).filter(Boolean))];
-              const myVisitCounts = myCafes.map(c => ({ cafe: c, count: logs.filter(l => l.cafe === c && !l.isHomemade).length }));
-              const favCafe = myVisitCounts.sort((a, b) => b.count - a.count)[0]?.cafe;
-              console.log('favCafe', favCafe, 'myVisitCounts', myVisitCounts);
-              const globalCafeRanks = Object.entries(communityStats.cafeVisits).sort((a,b) => b[1]-a[1]);
-              console.log('globalCafeRanks', globalCafeRanks.slice(0, 5));
-              const favCafeRank = favCafe ? globalCafeRanks.findIndex(([c]) => c === favCafe) + 1 : null;
+              const friendLogs = logs;
+              const favCafe = [...new Set(friendLogs.filter(l => !l.isHomemade && l.cafe !== "unnamed cafe").map(l => l.cafe))].sort((a, b) => friendLogs.filter(l => l.cafe === b).length - friendLogs.filter(l => l.cafe === a).length)[0];
+              const myVisitCount = favCafe ? friendLogs.filter(l => l.cafe === favCafe).length : 0;
+              const cafeVisitors = favCafe ? Object.values(communityStats.cafeUserVisits[favCafe] || {}) : [];
+              const favCafeRank = favCafe ? cafeVisitors.filter((count) => count > myVisitCount).length + 1 : null;
+              const myTotalChugs = friendLogs.reduce((s, l) => s + (l.chugs || 1), 0);
               return (
                 <div style={{ background: C.card, borderRadius: 18, padding: "16px 20px", marginBottom: 12 }}>
 
                   {favCafe && favCafeRank > 0 && (
                     <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
-                      you're <span style={{ fontWeight: "700" }}>top #{favCafeRank}</span> at <span style={{ fontWeight: "700" }}>{favCafe}</span>
+                      {readOnly ? (
+                        <>{baristaName} is <span style={{ fontWeight: "700" }}>top #{favCafeRank}</span> at <span style={{ fontWeight: "700" }}>{favCafe}</span></>
+                      ) : (
+                        <>you&apos;re <span style={{ fontWeight: "700" }}>top #{favCafeRank}</span> at <span style={{ fontWeight: "700" }}>{favCafe}</span></>
+                      )}
                     </div>
                   )}
                   {myTotalChugs > 0 && (communityStats.userChugTotals || []).length > 0 && (() => {
-                    const myTotalChugs = logs.reduce((s, l) => s + (l.chugs || 1), 0);
                     const allUserChugs = communityStats.userChugTotals || [];
                     const below = allUserChugs.filter(n => n < myTotalChugs).length;
                     const topPct = Math.min(100, allUserChugs.length > 1 ? Math.round((1 - below / allUserChugs.length) * 100) : 100);
                     return (
                       <div style={{ color: C.text, fontSize: 14, textAlign: "center", marginBottom: 10, lineHeight: 1.4 }}>
-                        {`you are in the top ${topPct}% of com chuggers 🍵`}
+                        {readOnly
+                          ? `${baristaName} is in the top ${topPct}% of com chuggers 🍵`
+                          : `you are in the top ${topPct}% of com chuggers 🍵`}
                       </div>
                     );
                   })()}
@@ -2430,9 +2617,10 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
           </div>
         );
       })()}
+      </div>
 
       {/* Bottom nav */}
-      <div style={{ marginTop: "auto", padding: "0 28px 48px" }}>
+      <div style={{ position: "sticky", bottom: 0, background: C.bg, flexShrink: 0, padding: "0 28px 48px", zIndex: 10 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center" }}>
           {["cafe", "your lists", "stats"].map((t) => (
             <button
@@ -2451,9 +2639,10 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
                 transition: "all 0.15s",
               }}
             >
-              {t}
+              {t === "your lists" && readOnly ? `${baristaName}'s lists` : t}
             </button>
           ))}
+          {!readOnly && (
           <div onClick={() => setShowAvatar(true)} style={{
             width: 36,
             height: 36,
@@ -2473,6 +2662,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
@@ -2606,12 +2796,15 @@ function HomemadeDrinkScreen({ onNext, onBack, allHomemadeLogs = [] }) {
   );
 }
 
-function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
+function RankingScreen({ newCafe, rankedCafes, onDone, onBack, logs = [], rankHomemade = false }) {
   const C = useC();
+  const pool = rankHomemade
+    ? rankedCafes
+    : rankedCafes.filter((c) => !logs.find((l) => l.cafe === c && l.isHomemade));
   // We do head-to-head: newCafe vs each existing ranked cafe one at a time
   // If newCafe wins, it moves up; if it loses, it stays below that cafe
   // We binary-search style: compare against middle of remaining range
-  const [position, setPosition] = useState({ lo: 0, hi: rankedCafes.length });
+  const [position, setPosition] = useState({ lo: 0, hi: pool.length });
   const [insertIdx, setInsertIdx] = useState(null);
 
   const lo = position.lo;
@@ -2627,19 +2820,19 @@ function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
 
   if (insertIdx !== null) {
     // Auto-insert and proceed
-    const newRanked = [...rankedCafes];
+    const newRanked = [...pool];
     newRanked.splice(insertIdx, 0, newCafe);
     onDone(newRanked);
     return null;
   }
 
   // No existing cafes to compare against
-  if (rankedCafes.length === 0) {
+  if (pool.length === 0) {
     onDone([newCafe]);
     return null;
   }
 
-  const opponent = rankedCafes[mid];
+  const opponent = pool[mid];
 
   const choose = (winner) => {
     if (winner === "new") {
@@ -2691,10 +2884,10 @@ function RankingScreen({ newCafe, rankedCafes, onDone, onBack }) {
           ))}
         </div>
         <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", marginTop: 16, letterSpacing: "0.04em" }}>
-          ranking your cafes...
+          {rankHomemade ? "ranking your homemade drinks..." : "ranking your cafes..."}
         </div>
         <div style={{ marginTop: 20 }}>
-          <NextBtn label="skip" onClick={() => onDone(rankedCafes)} />
+          <NextBtn label="skip" onClick={() => onDone(pool)} />
         </div>
       </div>
     </div>
@@ -2758,12 +2951,15 @@ export default function App() {
       const allLogs = await sb.get("logs", "select=drinks,chugs,avg_price,cafe,user_id");
       if (!allLogs || allLogs.error) return;
       const drinkTotals = { matcha: 0, hojicha: 0, tea: 0, coffee: 0 };
-      const cafeVisits = {};
+      const cafeUserVisits = {};
       const perUserMatcha = {};
       const perUserChugs = {};
       allLogs.forEach(l => {
         (l.drinks || []).forEach(d => { if (drinkTotals[d] !== undefined) drinkTotals[d] += (l.chugs || 1); });
-        if (l.cafe) cafeVisits[l.cafe] = (cafeVisits[l.cafe] || 0) + 1;
+        if (l.cafe && l.user_id) {
+          if (!cafeUserVisits[l.cafe]) cafeUserVisits[l.cafe] = {};
+          cafeUserVisits[l.cafe][l.user_id] = (cafeUserVisits[l.cafe][l.user_id] || 0) + 1;
+        }
         if (l.user_id && (l.drinks||[]).includes("matcha")) {
           perUserMatcha[l.user_id] = (perUserMatcha[l.user_id] || 0) + (l.chugs || 1);
         }
@@ -2773,7 +2969,8 @@ export default function App() {
       const userChugTotals = Object.values(perUserChugs);
       console.log('userMatchaChugs', userMatchaChugs);
       console.log('perUserChugs', perUserChugs);
-      setCommunityStats({ drinkTotals, cafeVisits, totalLogs: allLogs.length, userMatchaChugs, userChugTotals });
+      console.log('cafeUserVisits', cafeUserVisits);
+      setCommunityStats({ drinkTotals, cafeUserVisits, totalLogs: allLogs.length, userMatchaChugs, userChugTotals });
     } catch(e) {}
   };
 
@@ -2814,7 +3011,7 @@ export default function App() {
     const newCafe = !knownCafes.includes(cafe);
     setIsNewCafe(newCafe);
     isNewCafeRef.current = newCafe;
-    setCurrentLog({ cafe, date: dateISO || new Date().toISOString().slice(0, 10) });
+    setCurrentLog({ cafe, date: dateISO || new Date().toISOString().slice(0, 10), location: location || "" });
     setScreen("drink");
   };
 
@@ -2837,7 +3034,8 @@ export default function App() {
           drinks: finalLog.drinks, chugs: finalLog.chugs,
           notes: finalLog.notes, avg_price: finalLog.avgPrice,
           amenities: finalLog.amenities, study_rating: finalLog.studyRating,
-          drink_rating: finalLog.drinkRating, labels: finalLog.labels
+          drink_rating: finalLog.drinkRating, labels: finalLog.labels,
+          location: finalLog.location || "",
         }).catch(() => {});
       }
       // Only rank if not already ranked
@@ -2868,18 +3066,21 @@ export default function App() {
         drinks: finalLog.drinks, chugs: finalLog.chugs,
         notes: finalLog.notes, avg_price: finalLog.avgPrice,
         amenities: finalLog.amenities, study_rating: finalLog.studyRating,
-        drink_rating: finalLog.drinkRating, labels: finalLog.labels
+        drink_rating: finalLog.drinkRating, labels: finalLog.labels,
+        location: finalLog.location || "",
       }).catch(() => {});
     }
     setScreen("ranking");
   };
 
-  const handleRankingDone = (newRanked) => {
-    setRankedCafes(newRanked);
+  const handleRankingDone = (newRankedCafes) => {
+    const homemadeRanks = rankedCafes.filter((c) => logs.some((l) => l.cafe === c && l.isHomemade));
+    const merged = [...newRankedCafes, ...homemadeRanks.filter((h) => !newRankedCafes.includes(h))];
+    setRankedCafes(merged);
     setCurrentLog({});
     setScreen("profile");
     if (userId) {
-      try { sb.patch("users", `id=eq.${userId}`, { ranked_cafes: newRanked }).catch(() => {}); } catch(e) {}
+      try { sb.patch("users", `id=eq.${userId}`, { ranked_cafes: merged }).catch(() => {}); } catch(e) {}
     }
   };
 
@@ -2935,18 +3136,21 @@ export default function App() {
         {screen === "ranking" && (
           <RankingScreen
             newCafe={currentLog.cafe || "unnamed cafe"}
-            rankedCafes={rankedCafes}
+            rankedCafes={rankedCafes.filter((c) => !logs.find((l) => l.cafe === c && l.isHomemade))}
+            logs={logs}
             onDone={handleRankingDone}
             onBack={() => setScreen("labels")}
           />
         )}
         {screen === "ranking-homemade" && (() => {
           const homemadeNames = [...new Set(logs.filter(l => l.isHomemade).map(l => l.cafe))];
-          const rankedHomemade = rankedCafes.filter(c => homemadeNames.includes(c) && c !== currentLog.cafe);
+          const rankedHomemade = rankedCafes.filter((c) => homemadeNames.includes(c) && c !== currentLog.cafe && !logs.some((l) => l.cafe === c && !l.isHomemade));
           return (
             <RankingScreen
+              rankHomemade
               newCafe={currentLog.cafe || "homemade"}
               rankedCafes={rankedHomemade}
+              logs={logs}
               onDone={(newRanked) => {
                 const cafeRanks = rankedCafes.filter(c => !homemadeNames.includes(c));
                 const merged = [...cafeRanks, ...newRanked];
@@ -2978,7 +3182,7 @@ export default function App() {
             friendId={friendViewId}
             onBack={() => { setFriendViewId(null); setShowFriends(true); }}
             myAvatar={avatar}
-            myBaristaName={baristaName}
+            communityStats={communityStats}
           />
         )}
       </div>

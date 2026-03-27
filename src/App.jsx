@@ -1355,7 +1355,7 @@ function FriendsScreen({ userId, friends, onClose, onViewFriend, onFriendsChange
               ))}
             </div>
           )}
-          <div>
+          <div style={{ paddingBottom: 20 }}>
             <div style={{ color: C.textMuted, fontSize: 12, letterSpacing: "0.06em", marginBottom: 12, textAlign: "left" }}>your friends</div>
             {(friends || []).length === 0 ? (
               <div style={{ color: C.textMuted, fontSize: 13, textAlign: "center" }}>no friends yet</div>
@@ -2346,7 +2346,7 @@ function ProfileScreen({ username, baristaName, logs, setLogs, rankedCafes = [],
               );
             })()}
 
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, paddingBottom: 20 }}>
               {(() => {
                 const filteredList = activeList.filter((cafeKey) => {
                   const cafeLogs = listTab === "homemade"

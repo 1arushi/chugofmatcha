@@ -607,6 +607,7 @@ function SignInScreen({ onLogin }) {
 function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [], onAddCafe, defaultLocation = "", onSaveDefaultLocation }) {
   const C = useC();
   const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
   const [selected, setSelected] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
@@ -654,7 +655,7 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
           <input
             placeholder=""
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setSelected(""); setShowSuggestions(true); setAddingNew(false); }}
+            onChange={(e) => { setQuery(e.target.value); setSelected(""); setShowSuggestions(true); setAddingNew(false); setError(""); }}
             onFocus={() => setShowSuggestions(true)}
             style={{ background: C.card, border: selected ? `2px solid ${C.text}` : "none", borderRadius: 50, padding: "14px 22px", color: C.text, fontSize: 15, width: "100%", outline: "none", boxSizing: "border-box", letterSpacing: "0.04em", textAlign: "center" }}
           />
@@ -726,7 +727,10 @@ function CafeEntryScreen({ onNext, onBack, onSkip, onHomemade, sharedCafes = [],
         </div>
       </div>
       <div style={{ paddingBottom: 40 }}>
+        {error && <div style={{ color: C.text, fontSize: 13, textAlign: "center", marginBottom: 12, opacity: 0.8 }}>{error}</div>}
         <NextBtn onClick={async () => {
+          if (!query.trim()) { setError("enter a cafe name"); return; }
+          setError("");
           setShowSuggestions(false);
           const cafeName = (selected || query || "unnamed cafe").toLowerCase();
           const entry = location ? `${cafeName} · ${location.trim().toLowerCase()}` : cafeName;
